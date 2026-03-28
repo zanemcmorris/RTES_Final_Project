@@ -1,0 +1,2 @@
+../Core/Src/debug.c:10:5:myprintf	1
+../Core/Src/debug.c:22:5:usart_puts	1

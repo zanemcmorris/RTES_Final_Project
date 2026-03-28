@@ -1,0 +1,11 @@
+../Middlewares/HCI/Controller/bluenrg_utils.c:73:17:updater_calc_crc	7
+../Middlewares/HCI/Controller/bluenrg_utils.c:97:5:program_device	34
+../Middlewares/HCI/Controller/bluenrg_utils.c:192:5:read_IFR	6
+../Middlewares/HCI/Controller/bluenrg_utils.c:221:6:parse_IFR_data_config	1
+../Middlewares/HCI/Controller/bluenrg_utils.c:232:5:IFR_validate	10
+../Middlewares/HCI/Controller/bluenrg_utils.c:250:6:change_IFR_data_config	1
+../Middlewares/HCI/Controller/bluenrg_utils.c:262:5:program_IFR	18
+../Middlewares/HCI/Controller/bluenrg_utils.c:339:9:verify_IFR	5
+../Middlewares/HCI/Controller/bluenrg_utils.c:365:9:getBlueNRGVersion	2
+../Middlewares/HCI/Controller/bluenrg_utils.c:388:9:getBlueNRGUpdaterVersion	4
+../Middlewares/HCI/Controller/bluenrg_utils.c:406:9:isHWBootloader_Patched	7

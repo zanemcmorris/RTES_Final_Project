@@ -1,0 +1,2 @@
+../Middlewares/Utils/osal.c:51:7:Osal_MemCpy	1
+../Middlewares/Utils/osal.c:63:7:Osal_MemSet	1

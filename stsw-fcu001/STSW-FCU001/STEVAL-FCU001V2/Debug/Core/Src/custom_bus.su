@@ -1,0 +1,9 @@
+../Core/Src/custom_bus.c:88:9:BSP_SPI2_Init	16	static
+../Core/Src/custom_bus.c:129:9:BSP_SPI2_DeInit	16	static
+../Core/Src/custom_bus.c:155:9:BSP_SPI2_Send	24	static
+../Core/Src/custom_bus.c:172:10:BSP_SPI2_Recv	24	static
+../Core/Src/custom_bus.c:189:9:BSP_SPI2_SendRecv	40	static
+../Core/Src/custom_bus.c:258:9:BSP_GetTick	8	static
+../Core/Src/custom_bus.c:264:26:MX_SPI2_Init	24	static
+../Core/Src/custom_bus.c:287:13:SPI2_MspInit	48	static
+../Core/Src/custom_bus.c:331:13:SPI2_MspDeInit	16	static

@@ -1,0 +1,5 @@
+../Core/Src/quaternion.c:6:6:QuaternionNorm	1
+../Core/Src/quaternion.c:21:6:QuaternionMult	1
+../Core/Src/quaternion.c:40:6:QuaternionRotation	1
+../Core/Src/quaternion.c:67:6:QuaternionConj	1
+../Core/Src/quaternion.c:78:6:QuaternionToEuler	1
