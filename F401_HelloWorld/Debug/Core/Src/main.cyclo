@@ -1,0 +1,14 @@
+../Core/Src/main.c:69:13:IMU_CS_Low	1
+../Core/Src/main.c:74:13:IMU_CS_High	1
+../Core/Src/main.c:79:16:BSP_SPI2_Init	1
+../Core/Src/main.c:85:16:BSP_SPI2_DeInit	1
+../Core/Src/main.c:91:16:BSP_GetTick	1
+../Core/Src/main.c:96:16:BSP_SPI2_WriteReg	5
+../Core/Src/main.c:124:16:BSP_SPI2_ReadReg	5
+../Core/Src/main.c:162:5:main	2
+../Core/Src/main.c:209:16:MX_LSM6DSR_Init	10
+../Core/Src/main.c:254:6:MX_PA8_CS_Init	1
+../Core/Src/main.c:275:6:SystemClock_Config	3
+../Core/Src/main.c:317:13:MX_SPI2_Init	2
+../Core/Src/main.c:355:13:MX_GPIO_Init	1
+../Core/Src/main.c:376:6:Error_Handler	1
