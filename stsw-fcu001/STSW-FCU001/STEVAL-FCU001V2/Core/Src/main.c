@@ -298,7 +298,12 @@ int main(void)
   BSP_LED_Off(LED2);
 
   // initialize All Sensors
-  CUSTOM_MOTION_SENSOR_Init(CUSTOM_LSM6DSR_0, MOTION_GYRO | MOTION_ACCELERO);
+	int status = CUSTOM_MOTION_SENSOR_Init(CUSTOM_LSM6DSR_0,
+			MOTION_GYRO | MOTION_ACCELERO);
+	if (status != BSP_ERROR_NONE)
+	{
+		while (1);
+	}
   CUSTOM_ENV_SENSOR_Init(CUSTOM_LPS22HH_0,ENV_PRESSURE | ENV_TEMPERATURE);
 
   // Enable All Sensors

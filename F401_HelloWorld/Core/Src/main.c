@@ -18,10 +18,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "lsm6dsr.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "lsm6dsr.h"
 
 /* USER CODE END Includes */
 
@@ -43,6 +43,8 @@
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi2;
 
+PCD_HandleTypeDef hpcd_USB_OTG_FS;
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -51,10 +53,10 @@ SPI_HandleTypeDef hspi2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
-void MX_PA8_CS_Init(void);
-static int32_t MX_LSM6DSR_Init(void);
-
+static void MX_USB_OTG_FS_PCD_Init(void);
 /* USER CODE BEGIN PFP */
+static int32_t MX_LSM6DSR_Init(void);
+void MX_PA8_CS_Init(void);
 
 /* USER CODE END PFP */
 
@@ -93,34 +95,6 @@ static int32_t BSP_GetTick(void)
 	return (int32_t) HAL_GetTick();
 }
 
-static int32_t BSP_SPI2_WriteReg(uint16_t Addr, uint16_t Reg, uint8_t *pData,
-		uint16_t Length)
-{
-	(void) Addr;
-
-	uint8_t txbuf[32];
-
-	if (Length == 0 || Length > (sizeof(txbuf) - 1))
-		return LSM6DSR_ERROR;
-
-	txbuf[0] = (uint8_t) Reg;
-	if (Length > 1U)
-		txbuf[0] |= 0x40;   // auto-increment
-
-	memcpy(&txbuf[1], pData, Length);
-
-	IMU_CS_Low();
-
-	if (HAL_SPI_Transmit(&hspi2, txbuf, Length + 1, 100) != HAL_OK)
-	{
-		IMU_CS_High();
-		return LSM6DSR_ERROR;
-	}
-
-	IMU_CS_High();
-	return LSM6DSR_OK;
-}
-
 static int32_t BSP_SPI2_ReadReg(uint16_t Addr, uint16_t Reg, uint8_t *pData,
 		uint16_t Length)
 {
@@ -132,10 +106,7 @@ static int32_t BSP_SPI2_ReadReg(uint16_t Addr, uint16_t Reg, uint8_t *pData,
 	if (Length == 0 || Length > (sizeof(txbuf) - 1))
 		return LSM6DSR_ERROR;
 
-	txbuf[0] = (uint8_t) Reg | 0x80;   // read bit
-	if (Length > 1U)
-		txbuf[0] |= 0x40;             // auto-increment
-
+	txbuf[0] = (uint8_t) Reg | 0x80;   // read bit only
 	memset(&txbuf[1], 0x00, Length);
 	memset(rxbuf, 0x00, Length + 1);
 
@@ -153,7 +124,30 @@ static int32_t BSP_SPI2_ReadReg(uint16_t Addr, uint16_t Reg, uint8_t *pData,
 	return LSM6DSR_OK;
 }
 
-/* USER CODE END 0 */
+static int32_t BSP_SPI2_WriteReg(uint16_t Addr, uint16_t Reg, uint8_t *pData,
+		uint16_t Length)
+{
+	(void) Addr;
+
+	uint8_t txbuf[32];
+
+	if (Length == 0 || Length > (sizeof(txbuf) - 1))
+		return LSM6DSR_ERROR;
+
+	txbuf[0] = (uint8_t) Reg;
+	memcpy(&txbuf[1], pData, Length);
+
+	IMU_CS_Low();
+
+	if (HAL_SPI_Transmit(&hspi2, txbuf, Length + 1, 100) != HAL_OK)
+	{
+		IMU_CS_High();
+		return LSM6DSR_ERROR;
+	}
+
+	IMU_CS_High();
+	return LSM6DSR_OK;
+}
 
 /**
  * @brief  The application entry point.
@@ -165,7 +159,9 @@ int main(void)
 	SystemClock_Config();
 	MX_GPIO_Init();
 	MX_PA8_CS_Init();
+	MX_PC13_CS_Init();
 	MX_SPI2_Init();
+//	MX_USB_OTG_FS_PCD_Init();
 
 //	while (1)
 //	{
@@ -179,7 +175,6 @@ int main(void)
 //		HAL_Delay(10);
 //	}
 
-
 	if (MX_LSM6DSR_Init() != LSM6DSR_OK)
 	{
 		while (1)
@@ -192,17 +187,45 @@ int main(void)
 		LSM6DSR_Axes_t accel;
 		LSM6DSR_Axes_t gyro;
 
-		if (LSM6DSR_ACC_GetAxes(&MotionSensor, &accel) == LSM6DSR_OK)
+		uint8_t acc_ready = 0;
+		uint8_t gyro_ready = 0;
+
+		LSM6DSR_ACC_Get_DRDY_Status(&MotionSensor, &acc_ready);
+		LSM6DSR_GYRO_Get_DRDY_Status(&MotionSensor, &gyro_ready);
+
+		if (acc_ready)
 		{
-			// accel.x accel.y accel.z
+			LSM6DSR_ACC_GetAxes(&MotionSensor, &accel);
 		}
 
-		if (LSM6DSR_GYRO_GetAxes(&MotionSensor, &gyro) == LSM6DSR_OK)
+		if (gyro_ready)
 		{
-			// gyro.x gyro.y gyro.z
+			LSM6DSR_GYRO_GetAxes(&MotionSensor, &gyro);
 		}
 
 		HAL_Delay(20);
+	}
+}
+
+static float lsm6dsr_raw_gyro_to_dps_fs(int16_t raw, int32_t fs_dps)
+{
+
+	switch (fs_dps)
+	{
+	case 125:
+		return ((float) raw) * 0.004375f;
+	case 250:
+		return ((float) raw) * 0.00875f;
+	case 500:
+		return ((float) raw) * 0.0175f;
+	case 1000:
+		return ((float) raw) * 0.035f;
+	case 2000:
+		return ((float) raw) * 0.07f;
+	case 4000:
+		return ((float) raw) * 0.14f;
+	default:
+		return 0.0f;
 	}
 }
 
@@ -239,13 +262,16 @@ static int32_t MX_LSM6DSR_Init(void)
 	if (LSM6DSR_GYRO_Enable(&MotionSensor) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
-	if (LSM6DSR_ACC_SetOutputDataRate(&MotionSensor, 104.0f) != LSM6DSR_OK)
+	if (LSM6DSR_ACC_SetOutputDataRate(&MotionSensor, LSM6DSR_XL_ODR_833Hz) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
-	if (LSM6DSR_GYRO_SetOutputDataRate(&MotionSensor, 104.0f) != LSM6DSR_OK)
+	if (LSM6DSR_GYRO_SetOutputDataRate(&MotionSensor, LSM6DSR_XL_ODR_833Hz) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
 	if (LSM6DSR_ACC_SetFullScale(&MotionSensor, fullScale) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
+
+	if (LSM6DSR_GYRO_SetFullScale(&MotionSensor, LSM6DSR_250dps) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
 	return LSM6DSR_OK;
@@ -269,6 +295,27 @@ void MX_PA8_CS_Init(void)
 }
 
 /**
+ * @brief Configures CS for LPS22HH sensor
+ */
+void MX_PC13_CS_Init(void)
+{
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+	/* Enable GPIOA clock */
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+	/* Set CS high before fully configuring, so the sensor stays deselected */
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+
+	/* Configure PA8 as output push-pull */
+	GPIO_InitStruct.Pin = GPIO_PIN_13;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+}
+/* USER CODE END 0 */
+
+/**
  * @brief System Clock Configuration
  * @retval None
  */
@@ -285,10 +332,14 @@ void SystemClock_Config(void)
 	/** Initializes the RCC Oscillators according to the specified parameters
 	 * in the RCC_OscInitTypeDef structure.
 	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-	RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+	RCC_OscInitStruct.PLL.PLLM = 16;
+	RCC_OscInitStruct.PLL.PLLN = 336;
+	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
+	RCC_OscInitStruct.PLL.PLLQ = 7;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
 	{
 		Error_Handler();
@@ -298,12 +349,12 @@ void SystemClock_Config(void)
 	 */
 	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
 			| RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
 	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
 	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
 	{
 		Error_Handler();
 	}
@@ -329,8 +380,8 @@ static void MX_SPI2_Init(void)
 	hspi2.Init.Mode = SPI_MODE_MASTER;
 	hspi2.Init.Direction = SPI_DIRECTION_2LINES;
 	hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
-	hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
-	hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+	hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
+	hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
 	hspi2.Init.NSS = SPI_NSS_SOFT;
 	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
 	hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
@@ -348,6 +399,41 @@ static void MX_SPI2_Init(void)
 }
 
 /**
+ * @brief USB_OTG_FS Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_USB_OTG_FS_PCD_Init(void)
+{
+
+	/* USER CODE BEGIN USB_OTG_FS_Init 0 */
+
+	/* USER CODE END USB_OTG_FS_Init 0 */
+
+	/* USER CODE BEGIN USB_OTG_FS_Init 1 */
+
+	/* USER CODE END USB_OTG_FS_Init 1 */
+	hpcd_USB_OTG_FS.Instance = USB_OTG_FS;
+	hpcd_USB_OTG_FS.Init.dev_endpoints = 4;
+	hpcd_USB_OTG_FS.Init.speed = PCD_SPEED_FULL;
+	hpcd_USB_OTG_FS.Init.dma_enable = DISABLE;
+	hpcd_USB_OTG_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
+	hpcd_USB_OTG_FS.Init.Sof_enable = DISABLE;
+	hpcd_USB_OTG_FS.Init.low_power_enable = DISABLE;
+	hpcd_USB_OTG_FS.Init.lpm_enable = DISABLE;
+	hpcd_USB_OTG_FS.Init.vbus_sensing_enable = DISABLE;
+	hpcd_USB_OTG_FS.Init.use_dedicated_ep1 = DISABLE;
+	if (HAL_PCD_Init(&hpcd_USB_OTG_FS) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	/* USER CODE BEGIN USB_OTG_FS_Init 2 */
+
+	/* USER CODE END USB_OTG_FS_Init 2 */
+
+}
+
+/**
  * @brief GPIO Initialization Function
  * @param None
  * @retval None
@@ -358,6 +444,7 @@ static void MX_GPIO_Init(void)
 	/* USER CODE END MX_GPIO_Init_1 */
 
 	/* GPIO Ports Clock Enable */
+	__HAL_RCC_GPIOH_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 

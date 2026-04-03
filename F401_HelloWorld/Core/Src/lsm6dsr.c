@@ -183,7 +183,7 @@ int32_t LSM6DSR_Init(LSM6DSR_Object_t *pObj)
   }
 
   /* Select default output data rate. */
-  pObj->acc_odr = LSM6DSR_XL_ODR_104Hz;
+	pObj->acc_odr = LSM6DSR_XL_ODR_1667Hz;
 
   /* Output data rate selection - power down. */
   if (lsm6dsr_xl_data_rate_set(&(pObj->Ctx), LSM6DSR_XL_ODR_OFF) != LSM6DSR_OK)
@@ -198,7 +198,7 @@ int32_t LSM6DSR_Init(LSM6DSR_Object_t *pObj)
   }
 
   /* Select default output data rate. */
-  pObj->gyro_odr = LSM6DSR_GY_ODR_104Hz;
+	pObj->gyro_odr = LSM6DSR_XL_ODR_1667Hz;
 
   /* Output data rate selection - power down. */
   if (lsm6dsr_gy_data_rate_set(&(pObj->Ctx), LSM6DSR_GY_ODR_OFF) != LSM6DSR_OK)

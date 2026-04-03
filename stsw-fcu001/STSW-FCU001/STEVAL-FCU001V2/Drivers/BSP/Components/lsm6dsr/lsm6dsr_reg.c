@@ -1901,8 +1901,11 @@ int32_t lsm6dsr_data_ready_mode_get(stmdev_ctx_t *ctx,
   */
 int32_t lsm6dsr_device_id_get(stmdev_ctx_t *ctx, uint8_t *buff)
 {
-  int32_t ret;
-  ret = lsm6dsr_read_reg(ctx, LSM6DSR_WHO_AM_I, buff, 1);
+	int32_t ret = 0;
+	while (ret == 0)
+	{
+		ret = lsm6dsr_read_reg(ctx, LSM6DSR_WHO_AM_I, buff, 1);
+	}
   return ret;
 }
 
