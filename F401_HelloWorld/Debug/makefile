@@ -65,7 +65,7 @@ main-build: F401_HelloWorld.elf secondary-outputs
 
 # Tool invocations
 F401_HelloWorld.elf F401_HelloWorld.map: $(OBJS) $(USER_OBJS) C:\Users\Zane\Documents\SP26\RTES\Final\ Project\F401_HelloWorld\STM32F401CCUX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "F401_HelloWorld.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Zane\Documents\SP26\RTES\Final Project\F401_HelloWorld\STM32F401CCUX_FLASH.ld" --specs=nosys.specs -Wl,-Map="F401_HelloWorld.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "F401_HelloWorld.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Zane\Documents\SP26\RTES\Final Project\F401_HelloWorld\STM32F401CCUX_FLASH.ld" --specs=nosys.specs -Wl,-Map="F401_HelloWorld.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
