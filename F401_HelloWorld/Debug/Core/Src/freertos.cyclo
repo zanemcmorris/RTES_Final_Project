@@ -1,0 +1,4 @@
+../Core/Src/freertos.c:32:20:setUserLEDOne	1
+../Core/Src/freertos.c:76:6:assert	2
+../Core/Src/freertos.c:84:6:applicationInit	1
+../Core/Src/freertos.c:93:6:ledHeartbeatTask	1
