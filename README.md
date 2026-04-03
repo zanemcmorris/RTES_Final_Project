@@ -7,6 +7,8 @@ Admin todo list:
 
 Hardware todo list
 - Assemble drone body and test motors
+- Find a battery!
+- Buy another FCU?
 
 Software Todo List
 - LSM6DSR (IMU) Starting Driver -- IN PROGRESS -- Zane 4/1
