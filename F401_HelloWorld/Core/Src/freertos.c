@@ -265,11 +265,17 @@ static int32_t MX_LPS22HH_Init(void)
 	if (LPS22HH_TEMP_Enable(&BaroSensor) != LPS22HH_OK)
 		return LPS22HH_ERROR;
 
+	// TODO: Test this new LPF line
+	if (lps22hh_lp_bandwidth_set(&(BaroSensor.Ctx), LPS22HH_LPF_ODR_DIV_9) != LPS22HH_OK)
+		return LPS22HH_ERROR;
+
 	if (LPS22HH_PRESS_SetOutputDataRate(&BaroSensor, 10.0f) != LPS22HH_OK)
 		return LPS22HH_ERROR;
 
 	if (LPS22HH_TEMP_SetOutputDataRate(&BaroSensor, 10.0f) != LPS22HH_OK)
 		return LPS22HH_ERROR;
+	
+
 
 	return LPS22HH_OK;
 }
@@ -349,6 +355,24 @@ void flightControlTask();
 
 /* USER CODE END FunctionPrototypes */
 
+/* Hook prototypes */
+void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
+
+/* USER CODE BEGIN 4 */
+void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
+{
+   /* Run time stack overflow checking is performed if
+   configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2. This hook function is
+   called if a stack overflow is detected. */
+	(void) xTask;
+	(void) pcTaskName;
+	__disable_irq();
+	while (1)
+	{
+	}
+}
+/* USER CODE END 4 */
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
@@ -370,8 +394,6 @@ void applicationInit()
 
 	imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL, &imuAcquisitionTaskAttr);
 	assert(imuAcquisitionTaskID != 0);
-
-
 
 }
 /**
@@ -446,7 +468,7 @@ void IMUAcquisitionTask()
 			LPS22HH_TEMP_GetTemperature(&BaroSensor, &temperature_c);
 		}
 
-		if (press_ready || temp_ready)
+		if (press_ready)
 		{
 			baro_uart_send_line(pressure_hpa, temperature_c);
 		}
@@ -470,14 +492,5 @@ void flightControlTask()
 	}
 }
 
-void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
-{
-	(void) xTask;
-	(void) pcTaskName;
-	__disable_irq();
-	while (1)
-	{
-	}
-}
 /* USER CODE END Application */
 
