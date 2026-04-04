@@ -1,4 +1,6 @@
 "./Core/Src/freertos.o"
+"./Core/Src/lps22hh.o"
+"./Core/Src/lps22hh_reg.o"
 "./Core/Src/lsm6dsr.o"
 "./Core/Src/lsm6dsr_reg.o"
 "./Core/Src/main.o"
