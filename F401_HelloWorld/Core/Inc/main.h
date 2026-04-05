@@ -29,6 +29,7 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
 
+#include "hci_tl_interface.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -57,6 +58,13 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define BLE_IRQ_Pin GPIO_PIN_4
+#define BLE_IRQ_GPIO_Port GPIOA
+#define BLE_IRQ_EXTI_IRQn EXTI4_IRQn
+#define BLE_CS_Pin GPIO_PIN_0
+#define BLE_CS_GPIO_Port GPIOB
+#define BLE_RSTN_Pin GPIO_PIN_2
+#define BLE_RSTN_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

@@ -35,6 +35,8 @@ Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.o: \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h \
+ ../BlueNRG_MS/Target/hci_tl_interface.h ../Core/Inc/custom_bus.h \
+ ../Core/Inc/custom_conf.h ../Core/Inc/custom_errno.h \
  ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_ioreq.h \
  ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_core.h \
  ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_ioreq.h \
@@ -75,6 +77,10 @@ Middlewares/ST/STM32_USB_Device_Library/Core/Src/usbd_ctlreq.o: \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h:
+../BlueNRG_MS/Target/hci_tl_interface.h:
+../Core/Inc/custom_bus.h:
+../Core/Inc/custom_conf.h:
+../Core/Inc/custom_errno.h:
 ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_ioreq.h:
 ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_core.h:
 ../Middlewares/ST/STM32_USB_Device_Library/Core/Inc/usbd_ioreq.h:

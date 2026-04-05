@@ -19,11 +19,13 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "app_bluenrg_ms.h"
 #include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "lsm6dsr.h"
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -77,94 +79,95 @@ static void imu_uart_send_line(float ax_g, float ay_g, float az_g, float gx_dps,
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/* USER CODE END 0 */
+
 /**
- * @brief  The application entry point.
- * @retval int
- */
+  * @brief  The application entry point.
+  * @retval int
+  */
+int __io_putchar(int ch)
+{
+    HAL_UART_Transmit(&huart1, (uint8_t*)&ch, 1, 100);
+    return ch;
+}
 int main(void)
 {
-	HAL_Init();
-	SystemClock_Config();
-	MX_GPIO_Init();
-	MX_USART1_UART_Init();
-	MX_PA8_CS_Init();
-	MX_PC13_CS_Init();
-	MX_SPI2_Init();
-	MX_PB4_5_LED_Init();
 
-	osKernelInitialize();
+  /* USER CODE BEGIN 1 */
 
-	applicationInit();
+  /* USER CODE END 1 */
 
-	osKernelStart();
+  /* MCU Configuration--------------------------------------------------------*/
 
-	while (1);
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
 
-}
+  /* USER CODE BEGIN Init */
 
-void MX_PA8_CS_Init(void)
-{
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
+  /* USER CODE END Init */
 
-	/* Enable GPIOA clock */
-	__HAL_RCC_GPIOA_CLK_ENABLE();
-	/* Set CS high before fully configuring, so the sensor stays deselected */
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+  /* Configure the system clock */
+  SystemClock_Config();
 
-	/* Configure PA8 as output push-pull */
-	GPIO_InitStruct.Pin = GPIO_PIN_8;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-}
+  /* USER CODE BEGIN SysInit */
 
-/**
- * @brief Configures CS for LPS22HH sensor
- */
-void MX_PC13_CS_Init(void)
-{
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
+  /* USER CODE END SysInit */
 
-	/* Enable GPIOA clock */
-	__HAL_RCC_GPIOC_CLK_ENABLE();
-	/* Set CS high before fully configuring, so the sensor stays deselected */
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_SPI2_Init();
+  MX_USART1_UART_Init();
+  MX_BlueNRG_MS_Init();
+  /* USER CODE BEGIN 2 */
 
-	/* Configure PC13 as output push-pull */
-	GPIO_InitStruct.Pin = GPIO_PIN_13;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-	HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-}
+  /* USER CODE END 2 */
 
-/**
- * @brief Configure PB4 and PB5 for user LEDs
- */
-void MX_PB4_5_LED_Init(void)
-{
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
+  /* Init scheduler */
+ // osKernelInitialize();
 
-	/* Enable GPIOA clock */
-	__HAL_RCC_GPIOB_CLK_ENABLE();
-	/* Set CS high before fully configuring, so the sensor stays deselected */
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
 
-	/* Configure PB4 as output push-pull */
-	GPIO_InitStruct.Pin = GPIO_PIN_4;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
 
-	GPIO_InitStruct.Pin = GPIO_PIN_5;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
 
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* creation of defaultTask */
+  //defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
+
+  /* Start scheduler */
+ // osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+    /* USER CODE END WHILE */
+      MX_BlueNRG_MS_Process();
+
+    /* USER CODE BEGIN 3 */
+  }
+  /* USER CODE END 3 */
 }
 
 /**
@@ -290,6 +293,7 @@ static void MX_USART1_UART_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
@@ -297,6 +301,26 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, BLE_CS_Pin|BLE_RSTN_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : BLE_IRQ_Pin */
+  GPIO_InitStruct.Pin = BLE_IRQ_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(BLE_IRQ_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : BLE_CS_Pin BLE_RSTN_Pin */
+  GPIO_InitStruct.Pin = BLE_CS_Pin|BLE_RSTN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
