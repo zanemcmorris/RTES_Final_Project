@@ -492,5 +492,21 @@ void flightControlTask()
 	}
 }
 
+/*
+Approach:
+Since we will be asynchronously sending messages instead of checking the BLE message (polling) every 10msec or something using non-blocking stuff
+1) Trigger an interrupt when the message is received (IRQ - hci_tl_lowlevel_isr) (from Laptop -> MCU)
+2) Parse the message : Example : MOVE RIGHT x,y,z? parse the data, pitch - 10 blah blah need to brainstorm this
+3) Do the necessary stuff and Acknowledge back to Laptop (from MCU -> Laptop)? 
+4) 
+*/
+/**
+ * @brief Adding Primary task for Bluetooth to send recevived data from python to UART 
+ */
+
+ void bluetoothControlTask()
+ {
+
+ }
 /* USER CODE END Application */
 

@@ -173,14 +173,14 @@ void MX_BlueNRG_MS_Init(void)
     printf("GAP_Init failed.\n");
   }
 
-  ret = aci_gap_set_auth_requirement(MITM_PROTECTION_REQUIRED,
+  ret = aci_gap_set_auth_requirement(MITM_PROTECTION_NOT_REQUIRED,
                                      OOB_AUTH_DATA_ABSENT,
                                      NULL,
                                      7,
                                      16,
-                                     USE_FIXED_PIN_FOR_PAIRING,
-                                     123456,
-                                     BONDING);
+                                     DONOT_USE_FIXED_PIN_FOR_PAIRING,
+                                     0,
+                                     NO_BONDING);
   if (ret == BLE_STATUS_SUCCESS) {
     printf("BLE Stack Initialized.\n");
   }
