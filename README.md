@@ -19,6 +19,7 @@ Software Todo List
 - Find and learn a quaternion library?
 
 - Control loop implementation
+- Set up timers and spin motors 
 
 - Unit testing?
 - BLE integration? -- Dillon & Likhita Started
