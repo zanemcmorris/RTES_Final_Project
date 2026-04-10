@@ -34,6 +34,9 @@
 #define USER_LED_1_PIN (GPIO_PIN_4)
 #define USER_LED_2_PIN (GPIO_PIN_5)
 
+#define IMU_TASK_PERIOD_MS (50)
+#define IMU_TASK_PERIOD_S (IMU_TASK_PERIOD_MS / 1000.0f)
+
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
 
@@ -65,6 +68,9 @@ static spi_device_t baro_dev = {.hspi = &hspi2, .cs_port = BARO_CS_PORT, .cs_pin
 		BARO_CS_PIN};
 
 static LSM6DSR_Object_t MotionSensor;
+LSM6DSR_Axes_t accel_vel_absolute;
+LSM6DSR_Axes_t accel_pos_absolute;
+LSM6DSR_Axes_t gyro_absolute;
 
 static void spi2_deselect_all(void)
 {
@@ -311,6 +317,48 @@ static void baro_uart_send_line(float pressure_hpa, float temperature_c)
 	}
 }
 
+static void imu_uart_send_raw_line(const LSM6DSR_Axes_t *accel_raw,
+		const LSM6DSR_Axes_t *gyro_raw)
+{
+	char buf[128];
+	int len = snprintf(buf, sizeof(buf), "IMU,%ld,%ld,%ld,%ld,%ld,%ld\r\n",
+			(long) accel_raw->x, (long) accel_raw->y, (long) accel_raw->z,
+			(long) gyro_raw->x, (long) gyro_raw->y, (long) gyro_raw->z);
+
+	if (len > 0)
+	{
+		HAL_UART_Transmit(&huart1, (uint8_t*) buf, (uint16_t) len, 100);
+	}
+}
+
+static void imu_uart_send_integrated_line(const LSM6DSR_Axes_t *accel_integrated,
+		const LSM6DSR_Axes_t *gyro_integrated)
+{
+	char buf[128];
+	int len = snprintf(buf, sizeof(buf), "INT,%ld,%ld,%ld,%ld,%ld,%ld\r\n",
+			(long) accel_integrated->x, (long) accel_integrated->y,
+			(long) accel_integrated->z, (long) gyro_integrated->x,
+			(long) gyro_integrated->y, (long) gyro_integrated->z);
+
+	if (len > 0)
+	{
+		HAL_UART_Transmit(&huart1, (uint8_t*) buf, (uint16_t) len, 100);
+	}
+}
+
+static void imu_uart_send_displacement_line(const LSM6DSR_Axes_t *accel_displacement)
+{
+	char buf[96];
+	int len = snprintf(buf, sizeof(buf), "DISP,%ld,%ld,%ld\r\n",
+			(long) accel_displacement->x, (long) accel_displacement->y,
+			(long) accel_displacement->z);
+
+	if (len > 0)
+	{
+		HAL_UART_Transmit(&huart1, (uint8_t*) buf, (uint16_t) len, 100);
+	}
+}
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -326,6 +374,10 @@ osThreadId_t flightControlTaskID;
 osThreadAttr_t imuAcquisitionTaskAttr = {.name = "imuAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536};
 osThreadId_t imuAcquisitionTaskID;
+
+osThreadAttr_t uartCommTaskAttr = {.name = "uartCommTask", .priority = osPriorityRealtime,
+		.stack_size = 1536};
+osThreadId_t uartCommTaskID;
 
 
 /* USER CODE END PTD */
@@ -395,6 +447,9 @@ void applicationInit()
 	imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL, &imuAcquisitionTaskAttr);
 	assert(imuAcquisitionTaskID != 0);
 
+	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
+	assert(uartCommTaskID != 0);
+
 }
 /**
  * @brief Simple task to blink LEDs while the system is active
@@ -417,7 +472,16 @@ void uartCommTask()
 
 	while (1)
 	{
-		osDelay(100);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 1);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
+		osDelay(10);
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 0);
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
+//		osDelay(50);
 	}
 }
 
@@ -448,11 +512,22 @@ void IMUAcquisitionTask()
 		if (acc_ready)
 		{
 			LSM6DSR_ACC_GetAxes(&MotionSensor, &accel);
+			accel_vel_absolute.x += accel.x * IMU_TASK_PERIOD_S; // Convert
+			accel_vel_absolute.y += accel.y * IMU_TASK_PERIOD_S;
+			accel_vel_absolute.z += accel.z * IMU_TASK_PERIOD_S;
+
+			accel_pos_absolute.x += accel_vel_absolute.x * IMU_TASK_PERIOD_S;
+			accel_pos_absolute.y += accel_vel_absolute.y * IMU_TASK_PERIOD_S;
+			accel_pos_absolute.z += accel_vel_absolute.z * IMU_TASK_PERIOD_S;
+
 		}
 
 		if (gyro_ready)
 		{
 			LSM6DSR_GYRO_GetAxes(&MotionSensor, &gyro);
+			gyro_absolute.x += gyro.x * IMU_TASK_PERIOD_S;
+			gyro_absolute.y += gyro.y * IMU_TASK_PERIOD_S;
+			gyro_absolute.z += gyro.z * IMU_TASK_PERIOD_S;
 		}
 
 		LPS22HH_PRESS_Get_DRDY_Status(&BaroSensor, &press_ready);
@@ -473,8 +548,11 @@ void IMUAcquisitionTask()
 			baro_uart_send_line(pressure_hpa, temperature_c);
 		}
 
-		imu_uart_send_line(accel.x, accel.y, accel.z, gyro.x, gyro.y, gyro.z);
-
+//		imu_uart_send_line(accel.x, accel.y, accel.z, gyro.x, gyro.y, gyro.z);
+//		imu_uart_send_absolute_line(&accel_absolute, &gyro_absolute);
+		imu_uart_send_raw_line(&accel, &gyro);
+		imu_uart_send_integrated_line(&accel_vel_absolute, &gyro_absolute);
+		imu_uart_send_displacement_line(&accel_pos_absolute);
 		osDelay(50);
 
 	}
