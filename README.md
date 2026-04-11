@@ -6,20 +6,20 @@ Admin todo list:
 - -- -- BLE checkin time of 1ms or less? (EDF?)
 
 Hardware todo list
-- Assemble drone body and test motors -- Assembled one frame. Looking into 3D printing another
-- Find a battery! -- Ordered another one
-- Buy another FCU? -- Ordered another one
+- Assemble drone body and test motors -- Assembled one frame, 3D printed another and props
+- Find a battery! -- DONE -- Lots of batteries on hand 4/10
+- Buy another FCU? -- DONE -- Delivered 4/10
 
 Software Todo List
-- LSM6DSR (IMU) Starting Driver -- Almost Done -- Zane 4/3
+- LSM6DSR (IMU) Starting Driver -- DONE -- Zane 4/10
 - LSM6DSR Improved driver (non-blocking DMA-driven IO)
-- Barometer Driver -- Almost Done -- Zane 4/3
+- Barometer Driver -- DONE -- Zane 4/10
 - Barometer Improved Driver (non-blocking DMA-driven IO)
 
 - Find and learn a quaternion library?
 
 - Control loop implementation
-- Set up timers and spin motors 
+- Set up timers and spin motors -- Motors spun at 100% DC
 
 - Unit testing?
 - BLE integration? -- Dillon & Likhita Started
@@ -37,3 +37,10 @@ Work done For 4/3/26
 - Set up LS22HH barometer driver
 - Added barometer plot to plotter
 - Enabled FreeRTOS and implemented tasks for LEDHeartbeat and IMU-sampling-and-printing. 
+
+Work done for 4/10/26
+- Added added integration for gyro values to get angle of the board instead of rate
+- Updated plotter to show new integrated plots
+- Found 2 more LIPO batteries and new charger
+- Found the accelerometer data is coming out crazy and needs further debugging
+- Lots of work on exercise 6
