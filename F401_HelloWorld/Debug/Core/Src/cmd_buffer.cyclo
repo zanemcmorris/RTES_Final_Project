@@ -1,2 +1,0 @@
-../Core/Src/cmd_buffer.c:13:9:cbfifo_ble_write	1
-../Core/Src/cmd_buffer.c:26:9:cbfifo_ble_read	2
