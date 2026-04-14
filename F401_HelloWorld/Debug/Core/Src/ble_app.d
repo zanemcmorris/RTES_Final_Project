@@ -1,14 +1,13 @@
-Core/Src/freertos.o: ../Core/Src/freertos.c \
- ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h \
- ../Core/Inc/FreeRTOSConfig.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/portmacro.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h \
- ../Core/Inc/main.h ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
+Core/Src/ble_app.o: ../Core/Src/ble_app.c ../Core/Inc/ble_app.h \
+ ../Core/Inc/packet.h ../Middlewares/ST/BlueNRG-MS/includes/hci.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_types.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/hci_le.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/link_layer.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_def.h \
+ ../Middlewares/ST/BlueNRG-MS/hci/hci_tl_patterns/Basic/hci_tl.h \
+ ../BlueNRG_MS/Target/hci_tl_interface.h ../Core/Inc/custom_bus.h \
+ ../Core/Inc/custom_conf.h \
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_def.h \
@@ -40,26 +39,31 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h \
- ../BlueNRG_MS/Target/hci_tl_interface.h ../Core/Inc/custom_bus.h \
- ../Core/Inc/custom_conf.h ../Core/Inc/custom_errno.h \
- ../Middlewares/ST/BlueNRG-MS/hci/hci_tl_patterns/Basic/hci_tl.h \
+ ../Core/Inc/custom_errno.h \
  ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_types.h \
  ../Middlewares/ST/BlueNRG-MS/utils/ble_list.h \
- ../BlueNRG_MS/Target/bluenrg_conf.h ../BlueNRG_MS/App/app_bluenrg_ms.h \
- ../BlueNRG_MS/App/custom.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h \
- ../Core/Inc/lsm6dsr.h ../Core/Inc/lsm6dsr_reg.h ../Core/Inc/lps22hh.h \
- ../Core/Inc/lps22hh_reg.h
-../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h:
-../Core/Inc/FreeRTOSConfig.h:
-../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h:
-../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h:
-../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h:
-../Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/portmacro.h:
-../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h:
-../Middlewares/Third_Party/FreeRTOS/Source/include/task.h:
-../Middlewares/Third_Party/FreeRTOS/Source/include/list.h:
-../Core/Inc/main.h:
+ ../BlueNRG_MS/Target/bluenrg_conf.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_gap.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/link_layer.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_gap_aci.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_gatt_aci.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_gatt_server.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/compiler.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_hal_aci.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_aci_const.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/hci_const.h \
+ ../Middlewares/ST/BlueNRG-MS/includes/sm.h
+../Core/Inc/ble_app.h:
+../Core/Inc/packet.h:
+../Middlewares/ST/BlueNRG-MS/includes/hci.h:
+../Middlewares/ST/BlueNRG-MS/includes/bluenrg_types.h:
+../Middlewares/ST/BlueNRG-MS/includes/hci_le.h:
+../Middlewares/ST/BlueNRG-MS/includes/link_layer.h:
+../Middlewares/ST/BlueNRG-MS/includes/bluenrg_def.h:
+../Middlewares/ST/BlueNRG-MS/hci/hci_tl_patterns/Basic/hci_tl.h:
+../BlueNRG_MS/Target/hci_tl_interface.h:
+../Core/Inc/custom_bus.h:
+../Core/Inc/custom_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:
@@ -92,18 +96,17 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h:
-../BlueNRG_MS/Target/hci_tl_interface.h:
-../Core/Inc/custom_bus.h:
-../Core/Inc/custom_conf.h:
 ../Core/Inc/custom_errno.h:
-../Middlewares/ST/BlueNRG-MS/hci/hci_tl_patterns/Basic/hci_tl.h:
 ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_types.h:
 ../Middlewares/ST/BlueNRG-MS/utils/ble_list.h:
 ../BlueNRG_MS/Target/bluenrg_conf.h:
-../BlueNRG_MS/App/app_bluenrg_ms.h:
-../BlueNRG_MS/App/custom.h:
-../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h:
-../Core/Inc/lsm6dsr.h:
-../Core/Inc/lsm6dsr_reg.h:
-../Core/Inc/lps22hh.h:
-../Core/Inc/lps22hh_reg.h:
+../Middlewares/ST/BlueNRG-MS/includes/bluenrg_gap.h:
+../Middlewares/ST/BlueNRG-MS/includes/link_layer.h:
+../Middlewares/ST/BlueNRG-MS/includes/bluenrg_gap_aci.h:
+../Middlewares/ST/BlueNRG-MS/includes/bluenrg_gatt_aci.h:
+../Middlewares/ST/BlueNRG-MS/includes/bluenrg_gatt_server.h:
+../Middlewares/ST/BlueNRG-MS/includes/compiler.h:
+../Middlewares/ST/BlueNRG-MS/includes/bluenrg_hal_aci.h:
+../Middlewares/ST/BlueNRG-MS/includes/bluenrg_aci_const.h:
+../Middlewares/ST/BlueNRG-MS/includes/hci_const.h:
+../Middlewares/ST/BlueNRG-MS/includes/sm.h:

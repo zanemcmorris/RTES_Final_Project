@@ -1,6 +1,7 @@
 "./BlueNRG_MS/App/app_bluenrg_ms.o"
 "./BlueNRG_MS/App/sample_service.o"
 "./BlueNRG_MS/Target/hci_tl_interface.o"
+"./Core/Src/cmd_buffer.o"
 "./Core/Src/custom_bus.o"
 "./Core/Src/freertos.o"
 "./Core/Src/lps22hh.o"

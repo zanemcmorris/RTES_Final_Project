@@ -27,6 +27,21 @@
 #include "bluenrg_gap_aci.h"
 #include "bluenrg_gatt_aci.h"
 #include "bluenrg_hal_aci.h"
+#include <string.h>
+
+typedef struct {
+    float ax_g, ay_g, az_g;
+    float gx_dps, gy_dps, gz_dps;
+    float vel_x, vel_y, vel_z;
+    float angle_x, angle_y, angle_z;
+    float disp_x, disp_y, disp_z;
+    float pressure_hpa;
+    float temperature_c;
+} SensorData_t;
+
+
+
+extern volatile SensorData_t g_sensors;
 
 /* USER CODE BEGIN Includes */
 
@@ -173,6 +188,8 @@ void MX_BlueNRG_MS_Init(void)
     printf("GAP_Init failed.\n");
   }
 
+  //Needed to change this because while connecting to laptop it was asking password so I modified this to not use password. 
+  //Changed to no bonding, BLE is usually visible when bonding is enabled but it didnt make any difference here (need to investigate more)
   ret = aci_gap_set_auth_requirement(MITM_PROTECTION_NOT_REQUIRED,
                                      OOB_AUTH_DATA_ABSENT,
                                      NULL,
@@ -217,6 +234,47 @@ void MX_BlueNRG_MS_Process(void)
 
   User_Process();
   hci_user_evt_proc();
+  static uint32_t last_telem_tick = 0;
+ // static uint32_t telem_counter   = 0;
+  static uint8_t  pkt_toggle = 0;
+
+if (connected && notification_enabled)
+{
+    uint32_t now = HAL_GetTick();
+    if ((now - last_telem_tick) >= 50)   /* 20Hz alternating = 10Hz per packet type */
+    {
+        last_telem_tick = now;
+        uint8_t buf[20];
+        uint16_t ts = (uint16_t)(now & 0xFFFF);
+
+        if (pkt_toggle == 0)
+        {
+            /* Packet A: accel + pressure */
+            buf[0] = 0x41;
+            memcpy(buf + 1,  &ts,                    2);
+            memcpy(buf + 3,  &g_sensors.ax_g,        4);
+            memcpy(buf + 7,  &g_sensors.ay_g,        4);
+            memcpy(buf + 11, &g_sensors.az_g,        4);
+            memcpy(buf + 15, &g_sensors.pressure_hpa,4);
+            sendData(buf, 19);
+        }
+        else
+        {
+            /* Packet B: gyro */
+            buf[0] = 0x42;
+            memcpy(buf + 1,  &ts,               2);
+            memcpy(buf + 3,  &g_sensors.gx_dps, 4);
+            memcpy(buf + 7,  &g_sensors.gy_dps, 4);
+            memcpy(buf + 11, &g_sensors.gz_dps, 4);
+
+            float temp = 0.0f;  // padding (optional)
+            memcpy(buf + 15, &temp, 4);
+
+            sendData(buf, 19);
+        }
+        pkt_toggle ^= 1;
+    }
+}
 
   /* USER CODE BEGIN BlueNRG_MS_Process_PostTreatment */
 
@@ -249,6 +307,7 @@ static void User_Process(void)
   if (set_connectable)
   {
     /* Establish connection with remote device */
+    printf("Starting advertising...\r\n"); 
     Make_Connection();
     set_connectable = FALSE;
  //   user_button_init_state = BSP_PB_GetState(BUTTON_KEY);

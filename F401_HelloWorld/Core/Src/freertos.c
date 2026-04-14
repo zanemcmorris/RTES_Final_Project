@@ -21,6 +21,9 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "main.h"
+#include "hci_tl.h"
+#include "app_bluenrg_ms.h"
+#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -34,18 +37,18 @@
 #define USER_LED_1_PIN (GPIO_PIN_4)
 #define USER_LED_2_PIN (GPIO_PIN_5)
 
-extern SPI_HandleTypeDef hspi2;
-extern UART_HandleTypeDef huart1;
-
-static inline void setUserLEDOne(uint8_t state)
-{
-	HAL_GPIO_WritePin(USER_LED_1_PORT, USER_LED_1_PIN, state ? 0 : 1);
-}
+osEventFlagsId_t bleEventFlags;
 
 #define IMU_CS_PORT GPIOA
 #define IMU_CS_PIN  GPIO_PIN_8
 #define BARO_CS_PORT GPIOC
-#define BARO_CS_PIN GPIO_PIN_13
+#define BARO_CS_PIN  GPIO_PIN_13
+
+#define IMU_TASK_PERIOD_MS (50)
+#define IMU_TASK_PERIOD_S  (50.0f / 1000.0f)
+
+extern SPI_HandleTypeDef hspi2;
+extern UART_HandleTypeDef huart1;
 
 typedef struct
 {
@@ -53,6 +56,18 @@ typedef struct
 	GPIO_TypeDef *cs_port;
 	uint16_t cs_pin;
 } spi_device_t;
+
+typedef struct {
+    float ax_g, ay_g, az_g;
+    float gx_dps, gy_dps, gz_dps;
+    float vel_x, vel_y, vel_z;
+    float angle_x, angle_y, angle_z;
+    float disp_x, disp_y, disp_z;
+    float pressure_hpa;
+    float temperature_c;
+} SensorData_t;
+
+volatile SensorData_t g_sensors = {0};
 
 static LSM6DSR_Object_t MotionSensor;
 static LPS22HH_Object_t BaroSensor;
@@ -64,7 +79,20 @@ static spi_device_t imu_dev = {.hspi = &hspi2, .cs_port = IMU_CS_PORT, .cs_pin =
 static spi_device_t baro_dev = {.hspi = &hspi2, .cs_port = BARO_CS_PORT, .cs_pin =
 		BARO_CS_PIN};
 
-static LSM6DSR_Object_t MotionSensor;
+/* Integrated motion state — written only by IMUAcquisitionTask */
+static LSM6DSR_Axes_t accel_vel_absolute;
+static LSM6DSR_Axes_t accel_pos_absolute;
+static LSM6DSR_Axes_t gyro_absolute;
+
+static inline void setUserLEDOne(uint8_t state)
+{
+	HAL_GPIO_WritePin(USER_LED_1_PORT, USER_LED_1_PIN, state ? 0 : 1);
+}
+
+static inline void setUserLEDTwo(uint8_t state)
+{
+	HAL_GPIO_WritePin(USER_LED_2_PORT, USER_LED_2_PIN, state ? 0 : 1);
+}
 
 static void spi2_deselect_all(void)
 {
@@ -281,23 +309,55 @@ static int32_t MX_LPS22HH_Init(void)
 }
 
 /**
- * @brief Function for printing formatted data for Python plotter
+ * @brief Send raw IMU axes over UART for Python plotter.
+ *        Accel values are converted from mg -> g; gyro from mdps -> dps.
  */
-static void imu_uart_send_line(float ax_g, float ay_g, float az_g, float gx_dps,
-		float gy_dps, float gz_dps)
+static void imu_uart_send_raw_line(const LSM6DSR_Axes_t *accel_raw,
+		const LSM6DSR_Axes_t *gyro_raw)
 {
 	char buf[128];
-	int len = snprintf(buf, sizeof(buf), "IMU,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\r\n", ax_g,
-			ay_g, az_g, gx_dps, gy_dps, gz_dps);
+	/* Driver outputs mg (accel) and mdps (gyro) — divide by 1000 for g / dps */
+	int len = snprintf(buf, sizeof(buf), "IMU,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\r\n",
+			accel_raw->x / 1000.0f, accel_raw->y / 1000.0f, accel_raw->z / 1000.0f,
+			gyro_raw->x / 1000.0f, gyro_raw->y / 1000.0f, gyro_raw->z / 1000.0f);
 
 	if (len > 0)
-	{
 		HAL_UART_Transmit(&huart1, (uint8_t*) buf, (uint16_t) len, 100);
-	}
 }
 
 /**
- * @brief Helper for printing formatted baro data for Python plotter
+ * @brief Send integrated velocity (mg*s -> g*s) and gyro angle (mdps*s -> dps*s) over UART.
+ */
+static void imu_uart_send_integrated_line(const LSM6DSR_Axes_t *accel_integrated,
+		const LSM6DSR_Axes_t *gyro_integrated)
+{
+	char buf[128];
+	/* Integrated values carry the same mg / mdps scale from the raw driver values */
+	int len = snprintf(buf, sizeof(buf), "INT,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\r\n",
+			accel_integrated->x / 1000.0f, accel_integrated->y / 1000.0f,
+			accel_integrated->z / 1000.0f, gyro_integrated->x / 1000.0f,
+			gyro_integrated->y / 1000.0f, gyro_integrated->z / 1000.0f);
+
+	if (len > 0)
+		HAL_UART_Transmit(&huart1, (uint8_t*) buf, (uint16_t) len, 100);
+}
+
+/**
+ * @brief Send displacement (double-integrated accel, mg*s^2 -> g*s^2) over UART.
+ */
+static void imu_uart_send_displacement_line(const LSM6DSR_Axes_t *accel_displacement)
+{
+	char buf[96];
+	int len = snprintf(buf, sizeof(buf), "DISP,%.4f,%.4f,%.4f\r\n",
+			accel_displacement->x / 1000.0f, accel_displacement->y / 1000.0f,
+			accel_displacement->z / 1000.0f);
+
+	if (len > 0)
+		HAL_UART_Transmit(&huart1, (uint8_t*) buf, (uint16_t) len, 100);
+}
+
+/**
+ * @brief Send barometer pressure and temperature over UART.
  */
 static void baro_uart_send_line(float pressure_hpa, float temperature_c)
 {
@@ -315,17 +375,24 @@ static void baro_uart_send_line(float pressure_hpa, float temperature_c)
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-osThreadAttr_t ledHeartbeatAttr = {.name = "ledHeartbeat", .priority = osPriorityLow, };
+osThreadAttr_t ledHeartbeatAttr = {.name = "ledHeartbeat", .priority = osPriorityLow };
 osThreadId_t ledHeartbeatID;
 
-osThreadAttr_t flightControlTaskAttr =
-		{.name = "flightControl", .priority =
-		osPriorityRealtime, };
+osThreadAttr_t flightControlTaskAttr = {.name = "flightControl", .priority =
+		osPriorityRealtime};
 osThreadId_t flightControlTaskID;
 
 osThreadAttr_t imuAcquisitionTaskAttr = {.name = "imuAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536};
 osThreadId_t imuAcquisitionTaskID;
+
+osThreadAttr_t uartCommTaskAttr = {.name = "uartCommTask", .priority = osPriorityRealtime,
+		.stack_size = 1536};
+osThreadId_t uartCommTaskID;
+
+//Adding thread attributes and theadID for BLE Task
+osThreadAttr_t bleTaskAttr = {.name = "bleTask", .priority = osPriorityNormal, .stack_size = 2048};
+osThreadId_t bleTaskID;
 
 
 /* USER CODE END PTD */
@@ -347,11 +414,12 @@ osThreadId_t imuAcquisitionTaskID;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-void applicationInit();
-void ledHeartbeatTask();
-void uartCommTask();
-void IMUAcquisitionTask();
-void flightControlTask();
+void applicationInit(void);
+void ledHeartbeatTask(void *argument);
+void uartCommTask(void *argument);
+void IMUAcquisitionTask(void *argument);
+void flightControlTask(void *argument);
+void bluetoothControlTask(void *argument);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -380,8 +448,11 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
 /**
  * @brief Sets up tasks and other RTOS primitives
  */
-void applicationInit()
+void applicationInit(void)
 {
+	bleEventFlags = osEventFlagsNew(NULL); //Create the event flag for BLE task
+	assert(bleEventFlags != NULL);
+
 	int status = 0;
 	assert(MX_LSM6DSR_Init() == LSM6DSR_OK);
 	assert(MX_LPS22HH_Init() == LPS22HH_OK);
@@ -394,14 +465,21 @@ void applicationInit()
 
 	imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL, &imuAcquisitionTaskAttr);
 	assert(imuAcquisitionTaskID != 0);
+	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
+	assert(uartCommTaskID != 0);
+
+	//BLE Thread Create
+	bleTaskID = osThreadNew(bluetoothControlTask, NULL, &bleTaskAttr);
+	assert(bleTaskID != 0);
 
 }
 /**
  * @brief Simple task to blink LEDs while the system is active
  */
-void ledHeartbeatTask()
+void ledHeartbeatTask(void *argument)
 {
-	static bool ledState = 0;
+	(void) argument;
+	static bool ledState = false;
 	while (1)
 	{
 		setUserLEDOne(ledState);
@@ -410,26 +488,40 @@ void ledHeartbeatTask()
 	}
 }
 
-
-
-void uartCommTask()
+/**
+ * @brief Placeholder task — will be replaced with PID flight control and renamed
+ */
+void uartCommTask(void *argument)
 {
-
+	(void) argument;
 	while (1)
 	{
-		osDelay(100);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 1);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
+		osDelay(10);
+		// Uncomment to vary duty cycle from 100%.
+		// Starting at 100% is kinda handy for testing maximum lift ability on the fly.
+
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, 1);
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 1);
+//		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
+//		osDelay(10);
+
 	}
 }
 
-
 /**
- * @brief Task for acquiring IMU data periodically
+ * @brief Task for acquiring IMU and barometer data periodically
  */
-void IMUAcquisitionTask()
+void IMUAcquisitionTask(void *argument)
 {
+	(void) argument;
 
-	LSM6DSR_Axes_t accel;
-	LSM6DSR_Axes_t gyro;
+	LSM6DSR_Axes_t accel = {0};
+	LSM6DSR_Axes_t gyro = {0};
 	float pressure_hpa = 0.0f;
 	float temperature_c = 0.0f;
 
@@ -438,21 +530,36 @@ void IMUAcquisitionTask()
 	uint8_t press_ready = 0;
 	uint8_t temp_ready = 0;
 
-
-
 	while (1)
 	{
+		setUserLEDTwo(0);
+
 		LSM6DSR_ACC_Get_DRDY_Status(&MotionSensor, &acc_ready);
 		LSM6DSR_GYRO_Get_DRDY_Status(&MotionSensor, &gyro_ready);
 
 		if (acc_ready)
 		{
 			LSM6DSR_ACC_GetAxes(&MotionSensor, &accel);
+
+			/* Integrate acceleration (mg) -> velocity (mg*s) */
+			accel_vel_absolute.x += accel.x * IMU_TASK_PERIOD_S;
+			accel_vel_absolute.y += accel.y * IMU_TASK_PERIOD_S;
+			accel_vel_absolute.z += accel.z * IMU_TASK_PERIOD_S;
+
+			/* Integrate velocity -> displacement (mg*s^2) */
+			accel_pos_absolute.x += accel_vel_absolute.x * IMU_TASK_PERIOD_S;
+			accel_pos_absolute.y += accel_vel_absolute.y * IMU_TASK_PERIOD_S;
+			accel_pos_absolute.z += accel_vel_absolute.z * IMU_TASK_PERIOD_S;
 		}
 
 		if (gyro_ready)
 		{
 			LSM6DSR_GYRO_GetAxes(&MotionSensor, &gyro);
+
+			/* Integrate gyro rate (mdps) -> angle (mdps*s) */
+			gyro_absolute.x += gyro.x * IMU_TASK_PERIOD_S;
+			gyro_absolute.y += gyro.y * IMU_TASK_PERIOD_S;
+			gyro_absolute.z += gyro.z * IMU_TASK_PERIOD_S;
 		}
 
 		LPS22HH_PRESS_Get_DRDY_Status(&BaroSensor, &press_ready);
@@ -473,10 +580,28 @@ void IMUAcquisitionTask()
 			baro_uart_send_line(pressure_hpa, temperature_c);
 		}
 
-		imu_uart_send_line(accel.x, accel.y, accel.z, gyro.x, gyro.y, gyro.z);
-
-		osDelay(50);
-
+		imu_uart_send_raw_line(&accel, &gyro);
+		imu_uart_send_integrated_line(&accel_vel_absolute, &gyro_absolute);
+		imu_uart_send_displacement_line(&accel_pos_absolute);
+        g_sensors.ax_g  = accel.x / 1000.0f;
+        g_sensors.ay_g  = accel.y / 1000.0f;
+        g_sensors.az_g  = accel.z / 1000.0f;
+        g_sensors.gx_dps = gyro.x / 1000.0f;
+        g_sensors.gy_dps = gyro.y / 1000.0f;
+        g_sensors.gz_dps = gyro.z / 1000.0f;
+        g_sensors.vel_x  = accel_vel_absolute.x / 1000.0f;
+        g_sensors.vel_y  = accel_vel_absolute.y / 1000.0f;
+        g_sensors.vel_z  = accel_vel_absolute.z / 1000.0f;
+        g_sensors.angle_x = gyro_absolute.x / 1000.0f;
+        g_sensors.angle_y = gyro_absolute.y / 1000.0f;
+        g_sensors.angle_z = gyro_absolute.z / 1000.0f;
+        g_sensors.disp_x  = accel_pos_absolute.x / 1000.0f;
+        g_sensors.disp_y  = accel_pos_absolute.y / 1000.0f;
+        g_sensors.disp_z  = accel_pos_absolute.z / 1000.0f;
+        g_sensors.pressure_hpa  = pressure_hpa;
+        g_sensors.temperature_c = temperature_c;
+		setUserLEDTwo(1);
+		osDelay(IMU_TASK_PERIOD_MS);
 	}
 
 }
@@ -484,8 +609,9 @@ void IMUAcquisitionTask()
 /**
  * @brief Primary task for flight control
  */
-void flightControlTask()
+void flightControlTask(void *argument)
 {
+	(void) argument;
 	while (1)
 	{
 		osDelay(100);
@@ -493,7 +619,7 @@ void flightControlTask()
 }
 
 /*
-Approach:
+Approach 1:
 Since we will be asynchronously sending messages instead of checking the BLE message (polling) every 10msec or something using non-blocking stuff
 1) Trigger an interrupt when the message is received (IRQ - hci_tl_lowlevel_isr) (from Laptop -> MCU)
 2) Parse the message : Example : MOVE RIGHT x,y,z? parse the data, pitch - 10 blah blah need to brainstorm this
@@ -504,9 +630,32 @@ Since we will be asynchronously sending messages instead of checking the BLE mes
  * @brief Adding Primary task for Bluetooth to send recevived data from python to UART 
  */
 
- void bluetoothControlTask()
+ void bluetoothControlTask(void *argument)
  {
+	printf("Before Init");
+	(void)argument;
+	MX_BlueNRG_MS_Init();
+	// if (BLE_App_Init() != BLE_APP_OK) {
+	// 	printf("BLE_App_Init FAILED\r\n");
+    //     /* Blink LED fast forever to signal failure */
+    //     while (1) {
+    //         HAL_GPIO_TogglePin(USER_LED_1_PORT, USER_LED_1_PIN);
+    //         osDelay(100);
+    //     }
+    // }
+	// printf("BLE OK — advertising as FCU_NODE\r\n");
+	// HAL_GPIO_WritePin(USER_LED_1_PORT, USER_LED_1_PIN, GPIO_PIN_SET);
+    printf("BLE middleware init done\r\n");
+	uint32_t last_telem_tick = 0;
+    uint32_t telem_counter   = 0;
 
+    while (1)
+    {
+		
+        osEventFlagsWait(bleEventFlags, 0x01, osFlagsWaitAny | osFlagsNoClear, 10);
+		osEventFlagsClear(bleEventFlags, 0x01);
+        MX_BlueNRG_MS_Process();   // app layer
+    }
  }
 /* USER CODE END Application */
 

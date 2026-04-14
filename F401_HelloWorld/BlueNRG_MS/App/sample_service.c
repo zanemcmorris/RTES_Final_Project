@@ -259,11 +259,16 @@ void enableNotification(void)
  */
 void Attribute_Modified_CB(uint16_t handle, uint8_t data_length, uint8_t *att_data)
 {
+  printf("Attr modified: handle=0x%04X data_len=%d val=0x%02X\r\n",
+           handle, data_length, att_data[0]);
+  
+  
   if(handle == RXCharHandle + 1){
     receiveData(att_data, data_length);
   } else if (handle == TXCharHandle + 2) {
     if(att_data[0] == 0x01)
       notification_enabled = TRUE;
+      printf("Notifications enabled!\r\n");
   }
 }
 

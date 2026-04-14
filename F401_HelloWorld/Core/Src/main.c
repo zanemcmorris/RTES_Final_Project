@@ -120,7 +120,8 @@ int main(void)
 	MX_PC13_CS_Init();
   MX_PB4_5_LED_Init();
   MX_USART1_UART_Init();
-  MX_BlueNRG_MS_Init();
+  printf("MCU boot OK\r\n");
+  //MX_BlueNRG_MS_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
