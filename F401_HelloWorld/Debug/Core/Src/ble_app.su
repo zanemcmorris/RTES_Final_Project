@@ -1,0 +1,10 @@
+../Core/Inc/packet.h:57:23:telem_pack	16	static
+../Core/Src/ble_app.c:38:13:uuid16_to_array	40	static
+../Core/Src/ble_app.c:57:9:BLE_App_Init	96	static
+../Core/Src/ble_app.c:182:16:BLE_App_StartAdvertising	64	static
+../Core/Src/ble_app.c:213:9:BLE_App_SendTelemetry	40	static
+../Core/Src/ble_app.c:231:6:BLE_App_Process	8	static
+../Core/Src/ble_app.c:239:6:hci_le_connection_complete_event	24	static
+../Core/Src/ble_app.c:251:6:hci_disconnection_complete_event	16	static
+../Core/Src/ble_app.c:260:6:aci_gatt_attribute_modified_event	24	static
+../Core/Src/ble_app.c:271:28:BLE_OnCommandReceived	16	static

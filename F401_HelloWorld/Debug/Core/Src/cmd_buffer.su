@@ -1,0 +1,2 @@
+../Core/Src/cmd_buffer.c:13:9:cbfifo_ble_write	16	static
+../Core/Src/cmd_buffer.c:26:9:cbfifo_ble_read	16	static
