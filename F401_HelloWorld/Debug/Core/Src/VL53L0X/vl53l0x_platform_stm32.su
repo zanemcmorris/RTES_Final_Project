@@ -1,0 +1,13 @@
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:9:22:vl53l0x_hal_status_to_error	16	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:28:15:VL53L0X_LockSequenceAccess	16	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:34:15:VL53L0X_UnlockSequenceAccess	16	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:40:15:VL53L0X_WriteMulti	48	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:55:15:VL53L0X_ReadMulti	48	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:70:15:VL53L0X_WrByte	16	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:75:15:VL53L0X_WrWord	24	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:85:15:VL53L0X_WrDWord	32	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:97:15:VL53L0X_RdByte	24	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:102:15:VL53L0X_RdWord	32	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:117:15:VL53L0X_RdDWord	32	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:136:15:VL53L0X_UpdateByte	24	static
+../Core/Src/VL53L0X/vl53l0x_platform_stm32.c:152:15:VL53L0X_PollingDelay	16	static

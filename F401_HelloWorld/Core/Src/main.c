@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "lsm6dsr.h"
+extern void applicationInit(void);
 
 /* USER CODE END Includes */
 
@@ -51,13 +52,7 @@ TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart1;
 
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -69,7 +64,6 @@ static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_I2C2_Init(void);
-void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 static int32_t MX_LSM6DSR_Init(void);
@@ -120,15 +114,7 @@ int main(void)
   MX_TIM4_Init();
   MX_I2C2_Init();
 
-  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
-  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
-  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
-
-  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
-  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-  __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+  
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -154,9 +140,9 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
+  applicationInit();
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -431,18 +417,7 @@ static void MX_GPIO_Init(void)
  * @retval None
  */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
-{
-  /* init code for USB_DEVICE */
-  MX_USB_DEVICE_Init();
-  /* USER CODE BEGIN 5 */
-	/* Infinite loop */
-	for (;;)
-	{
-		osDelay(1);
-	}
-  /* USER CODE END 5 */
-}
+
 
 /**
   * @brief  Period elapsed callback in non blocking mode

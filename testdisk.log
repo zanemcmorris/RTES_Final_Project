@@ -1,0 +1,83 @@
+
+
+Mon Apr 20 16:00:57 2026
+Command line: TestDisk
+
+TestDisk 7.1, Data Recovery Utility, July 2019
+Christophe GRENIER <grenier@cgsecurity.org>
+https://www.cgsecurity.org
+OS: Linux, kernel 6.17.0-20-generic (#20~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Mar 19 01:28:37 UTC 2) x86_64
+Compiler: GCC 13.2
+ext2fs lib: 1.47.0, ntfs lib: libntfs-3g, reiserfs lib: none, ewf lib: none, curses lib: ncurses 6.4
+User is not root!
+Hard disk list
+
+
+TestDisk exited normally.
+Using locale 'en_US.UTF-8'.
+
+
+Mon Apr 20 16:00:59 2026
+Command line: TestDisk /debug
+
+TestDisk 7.1, Data Recovery Utility, July 2019
+Christophe GRENIER <grenier@cgsecurity.org>
+https://www.cgsecurity.org
+OS: Linux, kernel 6.17.0-20-generic (#20~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Mar 19 01:28:37 UTC 2) x86_64
+Compiler: GCC 13.2
+ext2fs lib: 1.47.0, ntfs lib: libntfs-3g, reiserfs lib: none, ewf lib: none, curses lib: ncurses 6.4
+Warning: can't get size for Disk /dev/mapper/control - 0 B - 0 sectors, sector size=512
+Warning: can't get size for Disk /dev/loop27 - 0 B - 0 sectors, sector size=512
+Hard disk list
+Disk /dev/loop0 - 4096 B - 8 sectors (RO), sector size=512
+Disk /dev/loop1 - 51 MB / 49 MiB - 100584 sectors (RO), sector size=512
+Disk /dev/loop10 - 17 MB / 16 MiB - 33680 sectors (RO), sector size=512
+Disk /dev/loop11 - 14 MB / 13 MiB - 27512 sectors (RO), sector size=512
+Disk /dev/loop12 - 77 MB / 73 MiB - 151512 sectors (RO), sector size=512
+Disk /dev/loop13 - 286 MB / 273 MiB - 560208 sectors (RO), sector size=512
+Disk /dev/loop14 - 593 KB / 580 KiB - 1160 sectors (RO), sector size=512
+Disk /dev/loop15 - 189 MB / 180 MiB - 370648 sectors (RO), sector size=512
+Disk /dev/loop16 - 702 MB / 669 MiB - 1371720 sectors (RO), sector size=512
+Disk /dev/loop17 - 70 MB / 66 MiB - 136872 sectors (RO), sector size=512
+Disk /dev/loop18 - 541 MB / 516 MiB - 1056784 sectors (RO), sector size=512
+Disk /dev/loop19 - 14 MB / 13 MiB - 27488 sectors (RO), sector size=512
+Disk /dev/loop2 - 267 MB / 254 MiB - 522136 sectors (RO), sector size=512
+Disk /dev/loop20 - 16 MB / 15 MiB - 31784 sectors (RO), sector size=512
+Disk /dev/loop21 - 635 MB / 606 MiB - 1241248 sectors (RO), sector size=512
+Disk /dev/loop22 - 77 MB / 73 MiB - 151456 sectors (RO), sector size=512
+Disk /dev/loop23 - 96 MB / 91 MiB - 187776 sectors (RO), sector size=512
+Disk /dev/loop24 - 593 KB / 580 KiB - 1160 sectors (RO), sector size=512
+Disk /dev/loop25 - 196 MB / 187 MiB - 383328 sectors (RO), sector size=512
+Disk /dev/loop26 - 50 MB / 48 MiB - 98480 sectors (RO), sector size=512
+Disk /dev/loop3 - 17 MB / 16 MiB - 33688 sectors (RO), sector size=512
+Disk /dev/loop4 - 70 MB / 66 MiB - 136904 sectors (RO), sector size=512
+Disk /dev/loop5 - 50 MB / 48 MiB - 99056 sectors (RO), sector size=512
+Disk /dev/loop6 - 11 MB / 10 MiB - 22176 sectors (RO), sector size=512
+Disk /dev/loop7 - 557 MB / 531 MiB - 1088256 sectors (RO), sector size=512
+Disk /dev/loop8 - 414 MB / 394 MiB - 808920 sectors (RO), sector size=512
+Disk /dev/loop9 - 51 MB / 48 MiB - 99976 sectors (RO), sector size=512
+Disk /dev/nvme0n1 - 1000 GB / 931 GiB - CHS 953869 64 32, sector size=512
+
+Partition table type (auto): EFI GPT
+Disk /dev/nvme0n1 - 1000 GB / 931 GiB
+Partition table type: EFI GPT
+
+Analyse Disk /dev/nvme0n1 - 1000 GB / 931 GiB - CHS 953869 64 32
+hdr_size=92
+hdr_lba_self=1
+hdr_lba_alt=1953525167 (expected 1953525167)
+hdr_lba_start=34
+hdr_lba_end=1953525134
+hdr_lba_table=2
+hdr_entries=128
+hdr_entsz=128
+Current partition structure:
+ 1 P EFI System                  2048     206847     204800 [EFI System Partition]
+Warning: number of heads/cylinder mismatches 255 (NTFS) != 64 (HD)
+Warning: number of sectors per track mismatches 63 (NTFS) != 32 (HD)
+ 2 P MS Data                   239616 1644454540 1644214925
+ 3 P Linux filesys. data   1644455936 1951655935  307200000
+Warning: number of heads/cylinder mismatches 255 (NTFS) != 64 (HD)
+Warning: number of sectors per track mismatches 63 (NTFS) != 32 (HD)
+ 4 P MS Data               1951655936 1953513471    1857536
+SIGHUP detected! TestDisk has been killed.
