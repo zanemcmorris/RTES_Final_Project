@@ -98,8 +98,8 @@
 					</folderInfo>
 					<sourceEntries>
 						<entry excluding="Src/VL53L0X/vl53l0x_platform_log.c|Src/VL53L0X/vl53l0x_platform.c|Src/VL53L0X/vl53l0x_i2c_platform.c|Src/VL53L0X/vl53l0x_i2c_win_serial_comms.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
-						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="USB_DEVICE"/>
 					</sourceEntries>
 				</configuration>
@@ -197,8 +197,8 @@
 					</folderInfo>
 					<sourceEntries>
 						<entry excluding="Src/VL53L0X/vl53l0x_platform_log.c|Src/VL53L0X/vl53l0x_platform.c|Src/VL53L0X/vl53l0x_i2c_platform.c|Src/VL53L0X/vl53l0x_i2c_win_serial_comms.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Core"/>
-						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares"/>
+						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="USB_DEVICE"/>
 					</sourceEntries>
 				</configuration>

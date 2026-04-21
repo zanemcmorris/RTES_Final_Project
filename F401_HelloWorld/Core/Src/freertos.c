@@ -22,6 +22,7 @@
 #include "task.h"
 #include "main.h"
 #include "vl53l0x_api.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "cmsis_os2.h"
@@ -58,7 +59,7 @@ extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
 
 extern I2C_HandleTypeDef hi2c2;  // for lidar
-
+extern TIM_HandleTypeDef htim4;
 static void imu_stats_send_line(void);
 static void baro_overrun_send_line(void);
 
@@ -1200,13 +1201,29 @@ void IMUAcquisitionTask(void *argument)
 	}
 }
 
-void flightControlTask(void *argument)
+/*void flightControlTask(void *argument)
 {
 	(void)argument;
 	while (1)
 	{
 		osDelay(100);
 	}
+}*/
+
+void flightControlTask(void *argument)
+{
+    (void)argument;
+
+    while (1)
+    {
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 210);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+
+        osDelay(100);
+    }
 }
+
 /* USER CODE END Application */
 
