@@ -21,7 +21,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "main.h"
-#include "vl53l0x_api.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -852,7 +851,7 @@ osThreadId_t flightControlTaskID;
 osThreadAttr_t imuAcquisitionTaskAttr = { .name = "imuAcquisition", .priority = osPriorityRealtime, .stack_size = 1536 };
 osThreadId_t imuAcquisitionTaskID;
 
-osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority = osPriorityRealtime, .stack_size = 1536 };
+osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority = osPriorityLow, .stack_size = 1536 };
 osThreadId_t uartCommTaskID;
 
 /*osThreadAttr_t tofAcquisitionTaskAttr = {
@@ -1074,8 +1073,8 @@ void uartCommTask(void *argument)
 
     while (1)
     {
-        vl53l0x_acquire_one_sample();
-        tof_uart_send_processed_line(&g_processed_tof);
+//        vl53l0x_acquire_one_sample();
+//        tof_uart_send_processed_line(&g_processed_tof);
         osDelay(200);
     }
 }
