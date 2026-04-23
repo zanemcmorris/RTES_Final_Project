@@ -13,111 +13,12 @@
 
 #include "vl53l0x_api.h"
 
-#define IMU_CS_PORT  GPIOA
-#define IMU_CS_PIN   GPIO_PIN_8
-#define BARO_CS_PORT GPIOC
-#define BARO_CS_PIN  GPIO_PIN_13
+extern osMutexId_t IMUDataMutexID;
 
-#define VL53L0X_I2C_ADDR_7BIT   (0x29U)
-#define VL53L0X_I2C_ADDR_8BIT   (VL53L0X_I2C_ADDR_7BIT << 1)
+#define IMU_SAMPLING_FREQ (LSM6DSR_XL_ODR_104Hz)
+#define IMU_SAMPLING_PERIOD (IMU_SAMPLING_FREQ / 1000.0f)
 
-#define IMU_TASK_PERIOD_S  (10.0f / 1000.0f)
 
-#define GRAVITY_MPS2  (9.80665f)
-#define DEG_TO_RAD    (0.01745329252f)
-#define SEA_LEVEL_HPA (1013.25f)
-
-extern SPI_HandleTypeDef hspi2;
-extern UART_HandleTypeDef huart1;
-extern I2C_HandleTypeDef hi2c2;
-
-typedef struct
-{
-    SPI_HandleTypeDef *hspi;
-    GPIO_TypeDef *cs_port;
-    uint16_t cs_pin;
-} spi_device_t;
-
-typedef struct
-{
-    uint32_t timestamp_us;
-
-    int32_t accel_x_mg;
-    int32_t accel_y_mg;
-    int32_t accel_z_mg;
-
-    int32_t gyro_x_mdps;
-    int32_t gyro_y_mdps;
-    int32_t gyro_z_mdps;
-
-    uint8_t accel_ready;
-    uint8_t gyro_ready;
-} raw_imu_sample_t;
-
-typedef struct
-{
-    uint32_t timestamp_us;
-
-    float accel_x_g;
-    float accel_y_g;
-    float accel_z_g;
-
-    float accel_x_mps2;
-    float accel_y_mps2;
-    float accel_z_mps2;
-
-    float gyro_x_dps;
-    float gyro_y_dps;
-    float gyro_z_dps;
-
-    float gyro_x_rps;
-    float gyro_y_rps;
-    float gyro_z_rps;
-} processed_imu_sample_t;
-
-typedef struct
-{
-    uint32_t timestamp_us;
-
-    float pressure_hpa;
-    float temperature_c;
-
-    uint8_t pressure_ready;
-    uint8_t temperature_ready;
-} raw_baro_sample_t;
-
-typedef struct
-{
-    uint32_t timestamp_us;
-
-    float pressure_hpa;
-    float temperature_c;
-    float altitude_m;
-} processed_baro_sample_t;
-
-typedef enum
-{
-    DEBUG_OUT_RAW_IMU = 0,
-    DEBUG_OUT_PROC_IMU,
-    DEBUG_OUT_PROC_BARO,
-    DEBUG_OUT_STAT
-} debug_output_mode_t;
-
-typedef struct
-{
-    uint32_t timestamp_us;
-    uint16_t range_mm;
-    uint8_t range_status;
-    uint8_t valid;
-} raw_tof_sample_t;
-
-typedef struct
-{
-    uint32_t timestamp_us;
-    float range_m;
-    uint8_t range_status;
-    uint8_t valid;
-} processed_tof_sample_t;
 
 static volatile debug_output_mode_t g_debug_output_mode = DEBUG_OUT_STAT;
 
@@ -128,10 +29,10 @@ static VL53L0X_Dev_t g_vl53l0x_dev;
 static spi_device_t imu_dev  = { .hspi = &hspi2, .cs_port = IMU_CS_PORT,  .cs_pin = IMU_CS_PIN };
 static spi_device_t baro_dev = { .hspi = &hspi2, .cs_port = BARO_CS_PORT, .cs_pin = BARO_CS_PIN };
 
-static raw_imu_sample_t        g_raw_imu = {0};
-static processed_imu_sample_t  g_processed_imu = {0};
-static raw_baro_sample_t       g_raw_baro = {0};
-static processed_baro_sample_t g_processed_baro = {0};
+raw_imu_sample_t        g_raw_imu = {0};
+processed_imu_sample_t  g_processed_imu = {0};
+raw_baro_sample_t       g_raw_baro = {0};
+processed_baro_sample_t g_processed_baro = {0};
 
 static float g_gyro_bias_x_mdps = 0.0f;
 static float g_gyro_bias_y_mdps = 0.0f;
@@ -310,12 +211,12 @@ static int32_t MX_LSM6DSR_Init(void)
     if (LSM6DSR_GYRO_Enable(&MotionSensor) != LSM6DSR_OK)
         return LSM6DSR_ERROR;
 
-    if (LSM6DSR_ACC_SetOutputDataRate(&MotionSensor, 104.0f) != LSM6DSR_OK)
+    if (LSM6DSR_ACC_SetOutputDataRate(&MotionSensor, IMU_SAMPLING_FREQ) != LSM6DSR_OK)
         return LSM6DSR_ERROR;
     if (LSM6DSR_ACC_SetFullScale(&MotionSensor, fullScale) != LSM6DSR_OK)
         return LSM6DSR_ERROR;
 
-    if (LSM6DSR_GYRO_SetOutputDataRate(&MotionSensor, 104.0f) != LSM6DSR_OK)
+    if (LSM6DSR_GYRO_SetOutputDataRate(&MotionSensor, IMU_SAMPLING_FREQ) != LSM6DSR_OK)
         return LSM6DSR_ERROR;
     if (LSM6DSR_GYRO_SetFullScale(&MotionSensor, LSM6DSR_250dps) != LSM6DSR_OK)
         return LSM6DSR_ERROR;
@@ -441,6 +342,11 @@ static void preprocess_imu_sample(const raw_imu_sample_t *raw, processed_imu_sam
     proc->gyro_x_rps = proc->gyro_x_dps * DEG_TO_RAD;
     proc->gyro_y_rps = proc->gyro_y_dps * DEG_TO_RAD;
     proc->gyro_z_rps = proc->gyro_z_dps * DEG_TO_RAD;
+
+    proc->gyro_x_rad_abs += proc->gyro_x_rps * IMU_SAMPLING_PERIOD;
+    proc->gyro_y_rad_abs += proc->gyro_y_rps * IMU_SAMPLING_PERIOD;
+    proc->gyro_z_rad_abs += proc->gyro_z_rps * IMU_SAMPLING_PERIOD;
+
 }
 
 static float pressure_to_altitude_m(float pressure_hpa)
@@ -778,7 +684,7 @@ static void vl53l0x_acquire_one_sample(void)
 
 static void calibrate_gyro_bias(void)
 {
-    const uint32_t num_samples = 300;
+    const uint32_t num_samples = 100;
     uint32_t collected = 0;
 
     int64_t sum_x = 0;
@@ -941,11 +847,6 @@ void SensorManager_RunOnce(void)
         g_gyro_ready_count++;
     }
 
-    /*
-    Keep these commented because your current behavior has them commented.
-    That way functionality does not change at all.
-    */
-    /*
     if (acc_ready)
     {
         LSM6DSR_ACC_GetAxes(&MotionSensor, &accel);
@@ -957,7 +858,7 @@ void SensorManager_RunOnce(void)
         LSM6DSR_GYRO_GetAxes(&MotionSensor, &gyro);
         g_gyro_read_count++;
     }
-    */
+
 
     g_raw_imu.timestamp_us = micros();
     g_raw_imu.accel_x_mg = accel.x;
@@ -969,7 +870,9 @@ void SensorManager_RunOnce(void)
     g_raw_imu.accel_ready = acc_ready;
     g_raw_imu.gyro_ready = gyro_ready;
 
+    osMutexAcquire(IMUDataMutexID, osWaitForever);
     preprocess_imu_sample(&g_raw_imu, &g_processed_imu);
+    osMutexRelease(IMUDataMutexID);
 
     LPS22HH_PRESS_Get_DRDY_Status(&BaroSensor, &press_ready);
     LPS22HH_TEMP_Get_DRDY_Status(&BaroSensor, &temp_ready);

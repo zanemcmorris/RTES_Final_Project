@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * File Name          : freertos.c
-  * Description        : Code for freertos applications
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * File Name          : freertos.c
+ * Description        : Code for freertos applications
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2026 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -35,62 +35,64 @@
 #define USER_LED_2_PIN  (GPIO_PIN_5)
 
 extern TIM_HandleTypeDef htim4;
+extern processed_imu_sample_t g_processed_imu;
+extern processed_baro_sample_t g_processed_baro;
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-osThreadAttr_t ledHeartbeatAttr = { .name = "ledHeartbeat", .priority = osPriorityLow };
+osThreadAttr_t ledHeartbeatAttr = { .name = "ledHeartbeat", .priority =
+		osPriorityLow };
 osThreadId_t ledHeartbeatID;
 
-osThreadAttr_t flightControlTaskAttr = { .name = "flightControl", .priority = osPriorityRealtime };
+osThreadAttr_t flightControlTaskAttr = { .name = "flightControl", .priority =
+		osPriorityRealtime };
 osThreadId_t flightControlTaskID;
 
-osThreadAttr_t imuAcquisitionTaskAttr = { .name = "imuAcquisition", .priority = osPriorityRealtime, .stack_size = 1536 };
+osThreadAttr_t imuAcquisitionTaskAttr = { .name = "imuAcquisition", .priority =
+		osPriorityRealtime, .stack_size = 1536 };
 osThreadId_t imuAcquisitionTaskID;
 
-osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority = osPriorityLow, .stack_size = 1536 };
+osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority =
+		osPriorityLow, .stack_size = 1536 };
 osThreadId_t uartCommTaskID;
 
 /*osThreadAttr_t tofAcquisitionTaskAttr = {
-    .name = "tofAcquisition",
-    .priority = osPriorityNormal,
-    .stack_size = 1536
-};
-osThreadId_t tofAcquisitionTaskID;*/
+ .name = "tofAcquisition",
+ .priority = osPriorityNormal,
+ .stack_size = 1536
+ };
+ osThreadId_t tofAcquisitionTaskID;*/
 
-osThreadAttr_t RPYTaskAttr = {.name = "rpyPIDTask", .priority = osPriorityRealtime,
-		.stack_size = 1536}; //needed?
+osThreadAttr_t RPYTaskAttr = { .name = "rpyPIDTask", .priority =
+		osPriorityRealtime, .stack_size = 1536 }; //needed?
 osThreadId_t RPYTaskID;
 
-osThreadAttr_t altitudeTaskAttr = {.name = "altitudePIDTask", .priority = osPriorityRealtime,
-		.stack_size = 1536}; //needed?
+osThreadAttr_t altitudeTaskAttr = { .name = "altitudePIDTask", .priority =
+		osPriorityRealtime, .stack_size = 1536 }; //needed?
 osThreadId_t altitudeTaskID;
 
-const osMutexAttr_t IMUDataMutexAttr = {
-  "IMUDataMutex",                          // human readable mutex name
-  osMutexRecursive | osMutexPrioInherit,    // attr_bits
-  NULL,                                     // memory for control block
-  0U                                        // size for control block
-};
+const osMutexAttr_t IMUDataMutexAttr = { "IMUDataMutex", // human readable mutex name
+		osMutexRecursive | osMutexPrioInherit,    // attr_bits
+		NULL,                                     // memory for control block
+		0U                                        // size for control block
+		};
 osMutexId_t IMUDataMutexID;
 
-const osMutexAttr_t altitudeDataMutexAttr = {
-  "altitudeDataMutex",                          // human readable mutex name
-  osMutexRecursive | osMutexPrioInherit,    // attr_bits
-  NULL,                                     // memory for control block
-  0U                                        // size for control block
-};
+const osMutexAttr_t altitudeDataMutexAttr = { "altitudeDataMutex", // human readable mutex name
+		osMutexRecursive | osMutexPrioInherit,    // attr_bits
+		NULL,                                     // memory for control block
+		0U                                        // size for control block
+		};
 osMutexId_t altitudeDataMutexID;
 
-const osMutexAttr_t outputThrustDataMutexAttr = {
-  "outputThrustDataMutex",                          // human readable mutex name
-  osMutexRecursive | osMutexPrioInherit,    // attr_bits
-  NULL,                                     // memory for control block
-  0U                                        // size for control block
-};
+const osMutexAttr_t outputThrustDataMutexAttr = { "outputThrustDataMutex", // human readable mutex name
+		osMutexRecursive | osMutexPrioInherit,    // attr_bits
+		NULL,                                     // memory for control block
+		0U                                        // size for control block
+		};
 osMutexId_t outputThrustDataMutexID;
-
 
 osSemaphoreId_t RPYReleaseSemID;
 osSemaphoreId_t altitudeReleaseSemID;
@@ -100,12 +102,10 @@ static void RPYTimerCallback(void *argument) {
 	osSemaphoreRelease(RPYReleaseSemID);
 }
 
-
 osTimerId_t altitudeTimer;
 static void altitudeTimerCallback(void *argument) {
 	osSemaphoreRelease(altitudeReleaseSemID);
 }
-
 
 /* USER CODE END PTD */
 
@@ -136,15 +136,14 @@ static void altitudeTimerCallback(void *argument) {
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-typedef struct{
+typedef struct {
 	int32_t kp;
 	int32_t ki;
 	int32_t kd;
 	int32_t setpoint; //in struct? cause it will need a mutex around it
 } PID_params_t;
 
-
-typedef struct{
+typedef struct {
 	float roll;
 	float pitch;
 	float yaw;
@@ -152,13 +151,10 @@ typedef struct{
 	bool initialized;
 } IMU_vals_t;
 
-
-
-static PID_params_t rollPIDParams = {1,1,1,0};
-static PID_params_t pitchPIDParams = {1,1,1,0};
-static PID_params_t yawPIDParams = {1,1,1,0};
-static PID_params_t altitudePIDParams = {1,1,1,0};
-
+static PID_params_t rollPIDParams = { 1, 1, 1, 0 };
+static PID_params_t pitchPIDParams = { 1, 1, 1, 0 };
+static PID_params_t yawPIDParams = { 1, 1, 1, 0 };
+static PID_params_t altitudePIDParams = { 1, 1, 1, 1654 };
 
 static float globalAltitudeOuput; //needed? static
 /* USER CODE END Variables */
@@ -173,149 +169,163 @@ void flightControlTask(void *argument);
 void RPY_PID_task(void *arguments);
 void altitude_PID_task(void *arguments);
 
-
-
 /* USER CODE END FunctionPrototypes */
 
 /* Hook prototypes */
 void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
 
 /* USER CODE BEGIN 4 */
-static inline void setUserLEDOne(uint8_t state)
-{
-	HAL_GPIO_WritePin(USER_LED_1_PORT, USER_LED_1_PIN, state ? GPIO_PIN_RESET : GPIO_PIN_SET);
+static inline void setUserLEDOne(uint8_t state) {
+	HAL_GPIO_WritePin(USER_LED_1_PORT, USER_LED_1_PIN,
+			state ? GPIO_PIN_RESET : GPIO_PIN_SET);
 }
 
-static inline void setUserLEDTwo(uint8_t state)
-{
-	HAL_GPIO_WritePin(USER_LED_2_PORT, USER_LED_2_PIN, state ? GPIO_PIN_RESET : GPIO_PIN_SET);
+static inline void setUserLEDTwo(uint8_t state) {
+	HAL_GPIO_WritePin(USER_LED_2_PORT, USER_LED_2_PIN,
+			state ? GPIO_PIN_RESET : GPIO_PIN_SET);
 }
 
-void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName)
-{
-	(void)xTask;
-	(void)pcTaskName;
+void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
+	(void) xTask;
+	(void) pcTaskName;
 	__disable_irq();
-	while (1)
-	{
+	while (1) {
 	}
 }
 /* USER CODE END 4 */
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-void applicationInit(void)
-{
-    assert(SensorManager_Init() == 0);
+void applicationInit(void) {
+	assert(SensorManager_Init() == 0);
 
-    ledHeartbeatID = osThreadNew(ledHeartbeatTask, NULL, &ledHeartbeatAttr);
-    assert(ledHeartbeatID != 0);
+	ledHeartbeatID = osThreadNew(ledHeartbeatTask, NULL, &ledHeartbeatAttr);
+	assert(ledHeartbeatID != 0);
 
 //    flightControlTaskID = osThreadNew(flightControlTask, NULL, &flightControlTaskAttr);
 //    assert(flightControlTaskID != 0);
 
-    imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL, &imuAcquisitionTaskAttr);
-    assert(imuAcquisitionTaskID != 0);
+	imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL,
+			&imuAcquisitionTaskAttr);
+	assert(imuAcquisitionTaskID != 0);
 
 //    uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
 //    assert(uartCommTaskID != 0);
 
+	//------
+	//set up mutexes and sempahores for PID
+	IMUDataMutexID = osMutexNew(&IMUDataMutexAttr);
+	assert(IMUDataMutexID != NULL);
 
-    //------
-        //set up mutexes and sempahores for PID
-    	IMUDataMutexID = osMutexNew(&IMUDataMutexAttr);
-    	assert(IMUDataMutexID != NULL);
+	altitudeDataMutexID = osMutexNew(&altitudeDataMutexAttr);
+	assert(altitudeDataMutexID != NULL);
 
-    	altitudeDataMutexID = osMutexNew(&altitudeDataMutexAttr);
-    	assert(altitudeDataMutexID != NULL);
+	outputThrustDataMutexID = osMutexNew(&outputThrustDataMutexAttr);
+	assert(outputThrustDataMutexID != NULL);
 
-    	outputThrustDataMutexID = osMutexNew(&outputThrustDataMutexAttr);
-    	assert(outputThrustDataMutexID != NULL);
+	RPYReleaseSemID = osSemaphoreNew(1, 1, NULL);
+	assert(RPYReleaseSemID != NULL);
 
-    	RPYReleaseSemID = osSemaphoreNew(1, 1, NULL);
-    	assert(RPYReleaseSemID != NULL);
+	altitudeReleaseSemID = osSemaphoreNew(1, 1, NULL);
+	assert(altitudeReleaseSemID != NULL);
 
-    	altitudeReleaseSemID = osSemaphoreNew(1, 1, NULL);
-    	assert(altitudeReleaseSemID != NULL);
+	//set up and create PID tasks
+	RPYTaskID = osThreadNew(RPY_PID_task, NULL, &RPYTaskAttr);
+	assert(RPYTaskID != 0);
 
-    	//set up and create PID tasks
-    	RPYTaskID = osThreadNew(RPY_PID_task, NULL, &RPYTaskAttr);
-    	assert(RPYTaskID != 0);
+	altitudeTaskID = osThreadNew(altitude_PID_task, NULL, &altitudeTaskAttr);
+	assert(altitudeTaskID != 0);
 
-    	altitudeTaskID = osThreadNew(altitude_PID_task, NULL, &altitudeTaskAttr);
-    	assert(altitudeTaskID != 0);
+	//configure PID sequencer timers
+	RPYTimer = osTimerNew(RPYTimerCallback, osTimerPeriodic, NULL, NULL);
+	altitudeTimer = osTimerNew(altitudeTimerCallback, osTimerPeriodic, NULL,
+			NULL);
 
-    	//configure PID sequencer timers
-    	RPYTimer = osTimerNew(RPYTimerCallback, osTimerPeriodic, NULL, NULL);
-    	altitudeTimer = osTimerNew(altitudeTimerCallback, osTimerPeriodic, NULL, NULL);
+	//asserts?
+	//start PID sequencer timers
+	osTimerStart(RPYTimer, msToTicks(2));
+	osTimerStart(altitudeTimer, msToTicks(10));
 
-    	//asserts?
-    	//start PID sequencer timers
-    	osTimerStart(RPYTimer, msToTicks(2));
-    	osTimerStart(altitudeTimer, msToTicks(10));
-
-    	//here?
-    	//start PWM control for motors
-        HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-    	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
-    	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
-    	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
-
+	//here?
+	//start PWM control for motors
+	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
+	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
+	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
 
 }
 
 //ai provided algorithm
 void update_orientation(IMU_vals_t *state, const processed_imu_sample_t *sample) {
-    if (!state->initialized) {
-        // Initial setup: Use accel for roll/pitch, zero for yaw
-        state->roll = atan2f(sample->accel_y_mps2, sample->accel_z_mps2);
-        state->pitch = atan2f(-sample->accel_x_mps2,
-                             sqrtf(sample->accel_y_mps2 * sample->accel_y_mps2 +
-                                   sample->accel_z_mps2 * sample->accel_z_mps2));
-        state->yaw = 0.0f;
-        state->timestamp_us = sample->timestamp_us;
-        state->initialized = true;
-        return;
-    }
+	if (!state->initialized) {
+		// Initial setup: Use accel for roll/pitch, zero for yaw
+		state->roll = atan2f(sample->accel_y_mps2, sample->accel_z_mps2);
+		state->pitch = atan2f(-sample->accel_x_mps2,
+				sqrtf(
+						sample->accel_y_mps2 * sample->accel_y_mps2
+								+ sample->accel_z_mps2 * sample->accel_z_mps2));
+		state->yaw = 0.0f;
+		state->timestamp_us = sample->timestamp_us;
+		state->initialized = true;
+		return;
+	}
 
-    // 1. Calculate Delta Time (dt)
-    float dt = (float)(sample->timestamp_us - state->timestamp_us) / 1000000.0f;
-    state->timestamp_us = sample->timestamp_us;
+	// 1. Calculate Delta Time (dt)
+	float dt = (float) (sample->timestamp_us - state->timestamp_us)
+			/ 1000000.0f;
+	state->timestamp_us = sample->timestamp_us;
 
-    // 2. Calculate Accel Angles (The "long-term" truth)
-    float roll_accel = atan2f(sample->accel_y_mps2, sample->accel_z_mps2);
-    float pitch_accel = atan2f(-sample->accel_x_mps2,
-                              sqrtf(sample->accel_y_mps2 * sample->accel_y_mps2 +
-                                    sample->accel_z_mps2 * sample->accel_z_mps2));
+	// 2. Calculate Accel Angles (The "long-term" truth)
+	float roll_accel = atan2f(sample->accel_y_mps2, sample->accel_z_mps2);
+	float pitch_accel = atan2f(-sample->accel_x_mps2,
+			sqrtf(
+					sample->accel_y_mps2 * sample->accel_y_mps2
+							+ sample->accel_z_mps2 * sample->accel_z_mps2));
 
-    // 3. Complementary Filter
-    // Angle = Alpha * (Angle + Gyro_Step) + (1 - Alpha) * Accel_Angle
-    state->roll = FILTER_ALPHA * (state->roll + sample->gyro_x_rps * dt) +
-                  (1.0f - FILTER_ALPHA) * roll_accel;
+	// 3. Complementary Filter
+	// Angle = Alpha * (Angle + Gyro_Step) + (1 - Alpha) * Accel_Angle
+	state->roll = FILTER_ALPHA * (state->roll + sample->gyro_x_rps * dt)
+			+ (1.0f - FILTER_ALPHA) * roll_accel;
 
-    state->pitch = FILTER_ALPHA * (state->pitch + sample->gyro_y_rps * dt) +
-                   (1.0f - FILTER_ALPHA) * pitch_accel;
+	state->pitch = FILTER_ALPHA * (state->pitch + sample->gyro_y_rps * dt)
+			+ (1.0f - FILTER_ALPHA) * pitch_accel;
 
-    // 4. Yaw (Integration only - will drift without a magnetometer)
-    state->yaw += sample->gyro_z_rps * dt;
+	// 4. Yaw (Integration only - will drift without a magnetometer)
+	state->yaw += sample->gyro_z_rps * dt;
 }
 
+void writeToMotors(int motorFR, int motorFL, int motorBR, int motorBL) {
+	if (motorFR > 100)
+		motorFR = 100;
+	if (motorFL > 100)
+		motorFL = 100;
+	if (motorBR > 100)
+		motorBR = 100;
+	if (motorBL > 100)
+		motorBL = 100;
+
+	if (motorFR < 0)
+		motorFR = 0;
+	if (motorFL < 0)
+		motorFL = 0;
+	if (motorBR < 0)
+		motorBR = 0;
+	if (motorBL < 0)
+		motorBL = 0;
 
 
-void writeToMotors(int motorFR, int motorFL, int motorBR, int motorBL){
-	if(motorFR > 100) motorFR = 100;
-	if(motorFL > 100) motorFL = 100;
-	if(motorBR > 100) motorBR = 100;
-	if(motorBL > 100) motorBL = 100;
 
 	//motor vals are between 0-2099, y = 2099/100 * x
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 20.99 * motorFR);
+	uint32_t frSetting = 20.99 * motorFR;
+
+
+	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, frSetting);
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 20.99 * motorFL);
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 20.99 * motorBR);
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 20.99 * motorBL);
 }
 
-void RPY_PID_task(void *arguments){
+void RPY_PID_task(void *arguments) {
 	//imu read 104 hz
 
 	(void) arguments;
@@ -329,40 +339,42 @@ void RPY_PID_task(void *arguments){
 	float yawIntegral = 0;
 	float yawLastError = 0;
 
-	IMU_vals_t currentState = {0};
+	IMU_vals_t currentState = { 0 };
 
 	uint32_t lastTimestampUs = 0;
 	bool isFirstRun = true;
 
-
-	for(;;){
+	for (;;) {
 
 		//have GPIO pin go high here, then low at the very end of task and measure Ci with scope
 
 		//synchronization for 500 hz (2 ms period) from RTOS timer
 		osSemaphoreAcquire(RPYReleaseSemID, PID_SEMAPHORE_TIMEOUT); //determine proper timeout val
 
-
 		osMutexAcquire(IMUDataMutexID, MUTEX_TIMEOUT); //lock mutex around IMU values, copy, then unlock
 		processed_imu_sample_t currentProcessedIMU = g_processed_imu;
-		osMutexRelease(IMUDataMutexID);//unlock
-
+		osMutexRelease(IMUDataMutexID); //unlock
 
 		float dt;
-		if(isFirstRun){
+		if (isFirstRun) {
 			dt = 0.002f; // Default for first run (1/500Hz)
 			lastTimestampUs = currentProcessedIMU.timestamp_us;
 			isFirstRun = false;
-		}else {
-			dt = (float)(currentProcessedIMU.timestamp_us - lastTimestampUs) / 1000000.0f;
+		} else {
+			dt = (float) (currentProcessedIMU.timestamp_us - lastTimestampUs)
+					/ 1000000.0f;
 			lastTimestampUs = currentProcessedIMU.timestamp_us;
 		}
 
-		if(dt <= 0.0f || dt > 0.05f) dt = 0.002f;
+		if (dt <= 0.0f || dt > 0.05f)
+			dt = 0.002f;
 
 		//process accel and velocity vals into RPY
-		update_orientation(&currentState, &currentProcessedIMU);
+//		update_orientation(&currentState, &currentProcessedIMU);
 
+		currentState.roll = currentProcessedIMU.gyro_x_rad_abs;
+		currentState.pitch = currentProcessedIMU.gyro_y_rad_abs;
+		currentState.yaw = currentProcessedIMU.gyro_z_rad_abs;
 
 		//get current roll error
 		float rollError = rollPIDParams.setpoint - currentState.roll;
@@ -371,47 +383,57 @@ void RPY_PID_task(void *arguments){
 		//get current yaw error
 		float yawError = yawPIDParams.setpoint - currentState.yaw;
 
-
 		//roll intergral and derivative calcs
 		rollIntegral += rollError * dt;
-		if (rollIntegral > ROLL_MAX_I) rollIntegral = ROLL_MAX_I;
-		else if (rollIntegral < -ROLL_MAX_I) rollIntegral = -ROLL_MAX_I;
+		if (rollIntegral > ROLL_MAX_I)
+			rollIntegral = ROLL_MAX_I;
+		else if (rollIntegral < -ROLL_MAX_I)
+			rollIntegral = -ROLL_MAX_I;
 
 		float rollDerivative = (rollError - rollLastError) / dt;
 
 		rollLastError = rollError;
 
-
 		//pitch intergral and derivative calcs
 		pitchIntegral += pitchError * dt;
-		if (pitchIntegral > PITCH_MAX_I) pitchIntegral = PITCH_MAX_I;
-		else if (pitchIntegral < -PITCH_MAX_I) pitchIntegral = -PITCH_MAX_I;
+		if (pitchIntegral > PITCH_MAX_I)
+			pitchIntegral = PITCH_MAX_I;
+		else if (pitchIntegral < -PITCH_MAX_I)
+			pitchIntegral = -PITCH_MAX_I;
 
 		float pitchDerivative = (pitchError - pitchLastError) / dt;
 
 		pitchLastError = pitchError;
 
-
 		//yaw intergral and derivative calcs
 		yawIntegral += yawError * dt;
-		if (yawIntegral > YAW_MAX_I) yawIntegral = YAW_MAX_I;
-		else if (yawIntegral < -YAW_MAX_I) yawIntegral = -YAW_MAX_I;
+		if (yawIntegral > YAW_MAX_I)
+			yawIntegral = YAW_MAX_I;
+		else if (yawIntegral < -YAW_MAX_I)
+			yawIntegral = -YAW_MAX_I;
 
 		float yawDerivative = (yawError - yawLastError) / dt;
 
 		yawLastError = yawError;
 
-
 		//calculate outputs
-		float rollOutput = (rollPIDParams.kp * rollError) + (rollPIDParams.ki * rollIntegral) + (rollPIDParams.kd * rollDerivative);
-		float pitchOutput = (pitchPIDParams.kp * pitchError) + (pitchPIDParams.ki * pitchIntegral) + (pitchPIDParams.kd * pitchDerivative);
-		float yawOutput = (yawPIDParams.kp * yawError) + (yawPIDParams.ki * yawIntegral) + (yawPIDParams.kd * yawDerivative);
+		float rollOutput = (rollPIDParams.kp * rollError)
+				+ (rollPIDParams.ki * rollIntegral)
+				+ (rollPIDParams.kd * rollDerivative);
+		float pitchOutput = (pitchPIDParams.kp * pitchError)
+				+ (pitchPIDParams.ki * pitchIntegral)
+				+ (pitchPIDParams.kd * pitchDerivative);
+		float yawOutput = (yawPIDParams.kp * yawError)
+				+ (yawPIDParams.ki * yawIntegral)
+				+ (yawPIDParams.kd * yawDerivative);
 
 		//need to clamp output?
-		if(rollOutput > MAX_OUTPUT) rollOutput = MAX_OUTPUT;
-		if(pitchOutput > MAX_OUTPUT) pitchOutput = MAX_OUTPUT;
-		if(yawOutput > MAX_OUTPUT) yawOutput = MAX_OUTPUT;
-
+		if (rollOutput > MAX_OUTPUT)
+			rollOutput = MAX_OUTPUT;
+		if (pitchOutput > MAX_OUTPUT)
+			pitchOutput = MAX_OUTPUT;
+		if (yawOutput > MAX_OUTPUT)
+			yawOutput = MAX_OUTPUT;
 
 		float latestAltitude = globalAltitudeOuput;
 
@@ -422,16 +444,20 @@ void RPY_PID_task(void *arguments){
 		float motorBL = latestAltitude + yawOutput - pitchOutput - rollOutput;
 
 		//cap output at 100% (?)
-		if(motorFR > 100) motorFR = 100;
-		if(motorFL > 100) motorFL = 100;
-		if(motorBR > 100) motorBR = 100;
-		if(motorBL > 100) motorBL = 100;
+		if (motorFR > 100)
+			motorFR = 100;
+		if (motorFL > 100)
+			motorFL = 100;
+		if (motorBR > 100)
+			motorBR = 100;
+		if (motorBL > 100)
+			motorBL = 100;
 
 		writeToMotors(motorFR, motorFL, motorBR, motorBL); //replace with real pwm function to change motor speeds
 	}
 }
 
-void altitude_PID_task(void *arguments){
+void altitude_PID_task(void *arguments) {
 
 	(void) arguments;
 
@@ -448,7 +474,7 @@ void altitude_PID_task(void *arguments){
 	// 1.0 = no filter, 0.1 = heavy filtering
 	const float d_filter_alpha = 0.2f;
 
-	for(;;){
+	for (;;) {
 
 		//turn led on here, then off at the very end of task and measure Ci with scope
 
@@ -462,7 +488,9 @@ void altitude_PID_task(void *arguments){
 		osMutexRelease(altitudeDataMutexID);
 
 		currentAltitude = currentBarometerReading.altitude_m;
-
+		if(currentAltitude == 0){
+			continue;
+		}
 
 		float dt;
 		if (isFirstRun) {
@@ -470,32 +498,37 @@ void altitude_PID_task(void *arguments){
 			lastBaroTimestampUs = currentBarometerReading.timestamp_us;
 			isFirstRun = false;
 		} else {
-			dt = (float)(currentBarometerReading.timestamp_us - lastBaroTimestampUs) / 1000000.0f;
+			dt = (float) (currentBarometerReading.timestamp_us
+					- lastBaroTimestampUs) / 1000000.0f;
 			lastBaroTimestampUs = currentBarometerReading.timestamp_us;
 		}
 
-
-		if (dt <= 0.0f || dt > 0.1f) dt = 0.01f;
-
+		if (dt <= 0.0f || dt > 0.1f)
+			dt = 0.01f;
 
 		float altitudeError = altitudePIDParams.setpoint - currentAltitude;
 
-
 		altitudeIntegral += altitudeError * dt;
-		if (altitudeIntegral > ALT_MAX_I) altitudeIntegral = ALT_MAX_I;
-		else if (altitudeIntegral < -ALT_MAX_I) altitudeIntegral = -ALT_MAX_I;
+		if (altitudeIntegral > ALT_MAX_I)
+			altitudeIntegral = ALT_MAX_I;
+		else if (altitudeIntegral < -ALT_MAX_I)
+			altitudeIntegral = -ALT_MAX_I;
 
 		float rawDerivative = (altitudeError - altitudeLastError) / dt;
-		altDerivativeFiltered = (d_filter_alpha * rawDerivative) + ((1.0f - d_filter_alpha) * altDerivativeFiltered);
+		altDerivativeFiltered = (d_filter_alpha * rawDerivative)
+				+ ((1.0f - d_filter_alpha) * altDerivativeFiltered);
 		altitudeLastError = altitudeError;
 
 //		float altitudeDerivative = (altitudeError - altitudeLastError) / dt;
 //		altitudeLastError = altitudeError;
 
-		float altitudeOutput = (altitudePIDParams.kp * altitudeError) + (altitudePIDParams.ki * altitudeIntegral) + (altitudePIDParams.kd * altDerivativeFiltered);
+		float altitudeOutput = (altitudePIDParams.kp * altitudeError)
+				+ (altitudePIDParams.ki * altitudeIntegral)
+				+ (altitudePIDParams.kd * altDerivativeFiltered);
 
 		//clamp output?
-		if(altitudeOutput > MAX_OUTPUT) altitudeOutput = MAX_OUTPUT;
+		if (altitudeOutput > MAX_OUTPUT)
+			altitudeOutput = MAX_OUTPUT;
 
 		osMutexAcquire(outputThrustDataMutexID, PID_SEMAPHORE_TIMEOUT); //mutex unlock
 		globalAltitudeOuput = altitudeOutput;
@@ -503,46 +536,39 @@ void altitude_PID_task(void *arguments){
 	}
 }
 
+void ledHeartbeatTask(void *argument) {
+	(void) argument;
+	static bool ledState = false;
 
-void ledHeartbeatTask(void *argument)
-{
-    (void)argument;
-    static bool ledState = false;
-
-    while (1)
-    {
-        setUserLEDOne(ledState);
-        ledState = !ledState;
-        osDelay(500);
-    }
+	while (1) {
+		setUserLEDOne(ledState);
+		ledState = !ledState;
+		osDelay(500);
+	}
 }
 
-void uartCommTask(void *argument)
-{
-    (void)argument;
-    osDelay(200);
+void uartCommTask(void *argument) {
+	(void) argument;
+	osDelay(200);
 
-    while (1)
-    {
-        osDelay(200);
-    }
+	while (1) {
+		osDelay(200);
+	}
 }
 
 /*void ToFAcquisitionTask(void *argument)
-{
-    (void)argument;
-    while (1)
-    {
-        osDelay(100);
-    }
-}*/
+ {
+ (void)argument;
+ while (1)
+ {
+ osDelay(100);
+ }
+ }*/
 
-void IMUAcquisitionTask(void *argument)
-{
-	(void)argument;
+void IMUAcquisitionTask(void *argument) {
+	(void) argument;
 
-	while (1)
-	{
+	while (1) {
 		setUserLEDTwo(0);
 		SensorManager_RunOnce();
 		setUserLEDTwo(1);
@@ -551,19 +577,18 @@ void IMUAcquisitionTask(void *argument)
 }
 
 /*void flightControlTask(void *argument)
-{
-	(void)argument;
-	while (1)
-	{
-		osDelay(100);
-	}
-}*/
+ {
+ (void)argument;
+ while (1)
+ {
+ osDelay(100);
+ }
+ }*/
 
-void flightControlTask(void *argument)
-{
-    (void)argument;
+void flightControlTask(void *argument) {
+	(void) argument;
 
-    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
@@ -573,15 +598,14 @@ void flightControlTask(void *argument)
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
 
-    while (1)
-    {
-        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
-        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-        __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+	while (1) {
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
 
-        osDelay(100);
-    }
+		osDelay(100);
+	}
 }
 
 /* USER CODE END Application */
