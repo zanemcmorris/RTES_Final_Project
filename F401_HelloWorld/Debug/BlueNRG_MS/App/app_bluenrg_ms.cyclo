@@ -1,4 +1,4 @@
-../BlueNRG_MS/App/app_bluenrg_ms.c:106:6:MX_BlueNRG_MS_Init	12
-../BlueNRG_MS/App/app_bluenrg_ms.c:229:6:MX_BlueNRG_MS_Process	5
-../BlueNRG_MS/App/app_bluenrg_ms.c:290:13:User_Init	1
-../BlueNRG_MS/App/app_bluenrg_ms.c:305:13:User_Process	14
+../BlueNRG_MS/App/app_bluenrg_ms.c:105:6:MX_BlueNRG_MS_Init	12
+../BlueNRG_MS/App/app_bluenrg_ms.c:227:6:MX_BlueNRG_MS_Process	7
+../BlueNRG_MS/App/app_bluenrg_ms.c:311:13:User_Init	1
+../BlueNRG_MS/App/app_bluenrg_ms.c:326:13:User_Process	2

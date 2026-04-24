@@ -27,6 +27,7 @@
 #include "bluenrg_gap_aci.h"
 #include "bluenrg_gatt_aci.h"
 #include "bluenrg_hal_aci.h"
+
 #include <string.h>
 
 typedef struct {
@@ -38,8 +39,6 @@ typedef struct {
     float pressure_hpa;
     float temperature_c;
 } SensorData_t;
-
-
 
 extern volatile SensorData_t g_sensors;
 
@@ -123,10 +122,10 @@ void MX_BlueNRG_MS_Init(void)
   uint16_t fwVersion;
   int ret;
 
-  User_Init();
+ // User_Init();
 
   /* Get the User Button initial state */
-//  user_button_init_state = BSP_PB_GetState(BUTTON_KEY);
+  //user_button_init_state = BSP_PB_GetState(BUTTON_KEY);
 
   hci_init(user_notify, NULL);
 
@@ -188,16 +187,15 @@ void MX_BlueNRG_MS_Init(void)
     printf("GAP_Init failed.\n");
   }
 
-  //Needed to change this because while connecting to laptop it was asking password so I modified this to not use password. 
-  //Changed to no bonding, BLE is usually visible when bonding is enabled but it didnt make any difference here (need to investigate more)
   ret = aci_gap_set_auth_requirement(MITM_PROTECTION_NOT_REQUIRED,
                                      OOB_AUTH_DATA_ABSENT,
-                                     NULL,
-                                     7,
-                                     16,
-                                     DONOT_USE_FIXED_PIN_FOR_PAIRING,
-                                     0,
-                                     NO_BONDING);
+                                    NULL,
+                                    7,
+                                    16,
+                                    DONOT_USE_FIXED_PIN_FOR_PAIRING,
+                                    0,
+                                    NO_BONDING);
+
   if (ret == BLE_STATUS_SUCCESS) {
     printf("BLE Stack Initialized.\n");
   }
@@ -234,9 +232,11 @@ void MX_BlueNRG_MS_Process(void)
 
   User_Process();
   hci_user_evt_proc();
+  
+
+  /* USER CODE BEGIN BlueNRG_MS_Process_PostTreatment */
   static uint32_t last_telem_tick = 0;
- // static uint32_t telem_counter   = 0;
-  static uint8_t  pkt_toggle = 0;
+static uint8_t  pkt_toggle = 0;
 
 if (connected && notification_enabled)
 {
@@ -247,36 +247,57 @@ if (connected && notification_enabled)
         uint8_t buf[20];
         uint16_t ts = (uint16_t)(now & 0xFFFF);
 
+     
+
         if (pkt_toggle == 0)
         {
-            /* Packet A: accel + pressure */
+            
+            // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+            /* Packet A: id(1) + ts(2) + ax(4) + ay(4) + az(4) + pressure(4) = 19 */
             buf[0] = 0x41;
             memcpy(buf + 1,  &ts,                    2);
-            memcpy(buf + 3,  &g_sensors.ax_g,        4);
-            memcpy(buf + 7,  &g_sensors.ay_g,        4);
-            memcpy(buf + 11, &g_sensors.az_g,        4);
-            memcpy(buf + 15, &g_sensors.pressure_hpa,4);
+            memcpy(buf + 3,  &g_sensors.ax_g,         4);
+            memcpy(buf + 7,  &g_sensors.ay_g,         4);
+            memcpy(buf + 11, &g_sensors.az_g,         4);
+            memcpy(buf + 15, &g_sensors.pressure_hpa, 4);
+           // printf("Sent the package 1\n");
+          //  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
             sendData(buf, 19);
         }
-        else
+        else if (pkt_toggle == 1)
         {
-            /* Packet B: gyro */
+            /* Packet B: id(1) + ts(2) + gx(4) + gy(4) + gz(4) + gz_integrated(4) = 19 */
             buf[0] = 0x42;
-            memcpy(buf + 1,  &ts,               2);
+            memcpy(buf + 1,  &ts,                2);
             memcpy(buf + 3,  &g_sensors.gx_dps, 4);
             memcpy(buf + 7,  &g_sensors.gy_dps, 4);
             memcpy(buf + 11, &g_sensors.gz_dps, 4);
-
-            float temp = 0.0f;  // padding (optional)
-            memcpy(buf + 15, &temp, 4);
-
+            memcpy(buf + 15, &g_sensors.angle_z, 4);  // integrated yaw, useful for the deg plot
+            // printf("Sent the package 2\n");
+            // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+            sendData(buf, 19);
+        }else{
+            buf[0] = 0x43;
+            memcpy(buf + 1,  &ts,               2);
+            memcpy(buf + 3,  &g_sensors.vel_x,  4);
+            memcpy(buf + 7,  &g_sensors.vel_y,  4);
+            memcpy(buf + 11, &g_sensors.vel_z,  4);
+            memcpy(buf + 15, &g_sensors.disp_z, 4);
+            // printf("Sent the package 3\n");
+            // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
             sendData(buf, 19);
         }
-        pkt_toggle ^= 1;
+        if(pkt_toggle == 0)
+        {
+            pkt_toggle = 1;
+        }else if(pkt_toggle == 1){
+            pkt_toggle = 2;
+        }else{
+            pkt_toggle = 0;
+        }
+       
     }
 }
-
-  /* USER CODE BEGIN BlueNRG_MS_Process_PostTreatment */
 
   /* USER CODE END BlueNRG_MS_Process_PostTreatment */
 }
@@ -289,10 +310,10 @@ if (connected && notification_enabled)
  */
 static void User_Init(void)
 {
-//  BSP_PB_Init(BUTTON_KEY, BUTTON_MODE_EXTI);
-//  BSP_LED_Init(LED2);
-//
-//  BSP_COM_Init(COM1);
+  // BSP_PB_Init(BUTTON_KEY, BUTTON_MODE_EXTI);
+  // BSP_LED_Init(LED2);
+
+  // BSP_COM_Init(COM1);
 }
 
 /**
@@ -307,57 +328,56 @@ static void User_Process(void)
   if (set_connectable)
   {
     /* Establish connection with remote device */
-    printf("Starting advertising...\r\n"); 
     Make_Connection();
     set_connectable = FALSE;
- //   user_button_init_state = BSP_PB_GetState(BUTTON_KEY);
+   // user_button_init_state = BSP_PB_GetState(BUTTON_KEY);
   }
 
-  if (BLE_Role == CLIENT)
-  {
-    /* Start TX handle Characteristic dynamic discovery if not yet done */
-    if (connected && !end_read_tx_char_handle){
-      startReadTXCharHandle();
-    }
-    /* Start RX handle Characteristic dynamic discovery if not yet done */
-    else if (connected && !end_read_rx_char_handle){
-      startReadRXCharHandle();
-    }
+  // if (BLE_Role == CLIENT)
+  // {
+  //   /* Start TX handle Characteristic dynamic discovery if not yet done */
+  //   if (connected && !end_read_tx_char_handle){
+  //     startReadTXCharHandle();
+  //   }
+  //   /* Start RX handle Characteristic dynamic discovery if not yet done */
+  //   else if (connected && !end_read_rx_char_handle){
+  //     startReadRXCharHandle();
+  //   }
 
-    if (connected && end_read_tx_char_handle && end_read_rx_char_handle && !notification_enabled)
-    {
-    //  BSP_LED_Off(LED2); //end of the connection and chars discovery phase
-      enableNotification();
-    }
-  }
+  //   if (connected && end_read_tx_char_handle && end_read_rx_char_handle && !notification_enabled)
+  //   {
+  //     BSP_LED_Off(LED2); //end of the connection and chars discovery phase
+  //     enableNotification();
+  //   }
+  // }
 
-  /* Check if the User Button has been pushed */
-  if (user_button_pressed)
-  {
-    /* Debouncing */
-    HAL_Delay(50);
+  // /* Check if the User Button has been pushed */
+  // if (user_button_pressed)
+  // {
+  //   /* Debouncing */
+  //   HAL_Delay(50);
 
-    /* Wait until the User Button is released */
-//    while (BSP_PB_GetState(BUTTON_KEY) == !user_button_init_state);
+  //   /* Wait until the User Button is released */
+  //   while (BSP_PB_GetState(BUTTON_KEY) == !user_button_init_state);
 
-    /* Debouncing */
-    HAL_Delay(50);
+  //   /* Debouncing */
+  //   HAL_Delay(50);
 
-    if (connected && notification_enabled)
-    {
-      /* Send a toggle command to the remote device */
-      uint8_t data[20] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','G','H','I','J'};
-      sendData(data, sizeof(data));
+  //   if (connected && notification_enabled)
+  //   {
+  //     /* Send a toggle command to the remote device */
+  //     uint8_t data[20] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','G','H','I','J'};
+  //     sendData(data, sizeof(data));
 
-      //BSP_LED_Toggle(LED2);  /* Toggle the LED2 locally. */
-                               /* If uncommented be sure the BSP_LED_Init(LED2)
-                                * is called in main().
-                                * E.g. it can be enabled for debugging. */
-    }
+  //     //BSP_LED_Toggle(LED2);  /* Toggle the LED2 locally. */
+  //                              /* If uncommented be sure the BSP_LED_Init(LED2)
+  //                               * is called in main().
+  //                               * E.g. it can be enabled for debugging. */
+  //   }
 
-    /* Reset the User Button flag */
-    user_button_pressed = 0;
-  }
+  //   /* Reset the User Button flag */
+  //   user_button_pressed = 0;
+  // }
 }
 
 /**

@@ -131,7 +131,7 @@ void Make_Connection(void)
     printf("Client Create Connection\n");
     tBDAddr bdaddr = {0xaa, 0x00, 0x00, 0xE1, 0x80, 0x02};
 
-  //  BSP_LED_On(LED2); //To indicate the start of the connection and discovery phase
+   // BSP_LED_On(LED2); //To indicate the start of the connection and discovery phase
 
     /*
     Scan_Interval, Scan_Window, Peer_Address_Type, Peer_Address, Own_Address_Type, Conn_Interval_Min,
@@ -207,7 +207,7 @@ void startReadRXCharHandle(void)
  */
 void receiveData(uint8_t* data_buffer, uint8_t Nb_bytes)
 {
-//  BSP_LED_Toggle(LED2);
+  //BSP_LED_Toggle(LED2);
 
   for(int i = 0; i < Nb_bytes; i++) {
     printf("%c", data_buffer[i]);
@@ -259,16 +259,15 @@ void enableNotification(void)
  */
 void Attribute_Modified_CB(uint16_t handle, uint8_t data_length, uint8_t *att_data)
 {
-  printf("Attr modified: handle=0x%04X data_len=%d val=0x%02X\r\n",
-           handle, data_length, att_data[0]);
-  
-  
   if(handle == RXCharHandle + 1){
+    //HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+
+   // printf("Package ACK\n");    
+   // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
     receiveData(att_data, data_length);
   } else if (handle == TXCharHandle + 2) {
     if(att_data[0] == 0x01)
       notification_enabled = TRUE;
-      printf("Notifications enabled!\r\n");
   }
 }
 

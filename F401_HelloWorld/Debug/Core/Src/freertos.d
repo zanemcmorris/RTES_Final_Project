@@ -42,11 +42,6 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h \
  ../BlueNRG_MS/Target/hci_tl_interface.h ../Core/Inc/custom_bus.h \
  ../Core/Inc/custom_conf.h ../Core/Inc/custom_errno.h \
- ../Middlewares/ST/BlueNRG-MS/hci/hci_tl_patterns/Basic/hci_tl.h \
- ../Middlewares/ST/BlueNRG-MS/includes/bluenrg_types.h \
- ../Middlewares/ST/BlueNRG-MS/utils/ble_list.h \
- ../BlueNRG_MS/Target/bluenrg_conf.h ../BlueNRG_MS/App/app_bluenrg_ms.h \
- ../BlueNRG_MS/App/custom.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h \
  ../Core/Inc/lsm6dsr.h ../Core/Inc/lsm6dsr_reg.h ../Core/Inc/lps22hh.h \
  ../Core/Inc/lps22hh_reg.h
@@ -96,12 +91,6 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
 ../Core/Inc/custom_bus.h:
 ../Core/Inc/custom_conf.h:
 ../Core/Inc/custom_errno.h:
-../Middlewares/ST/BlueNRG-MS/hci/hci_tl_patterns/Basic/hci_tl.h:
-../Middlewares/ST/BlueNRG-MS/includes/bluenrg_types.h:
-../Middlewares/ST/BlueNRG-MS/utils/ble_list.h:
-../BlueNRG_MS/Target/bluenrg_conf.h:
-../BlueNRG_MS/App/app_bluenrg_ms.h:
-../BlueNRG_MS/App/custom.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h:
 ../Core/Inc/lsm6dsr.h:
 ../Core/Inc/lsm6dsr_reg.h:

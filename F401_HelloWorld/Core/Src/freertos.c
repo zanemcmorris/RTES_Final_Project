@@ -21,9 +21,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "main.h"
-#include "hci_tl.h"
-#include "app_bluenrg_ms.h"
-#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -532,7 +529,7 @@ void IMUAcquisitionTask(void *argument)
 
 	while (1)
 	{
-		setUserLEDTwo(0);
+		//setUserLEDTwo(0);
 
 		LSM6DSR_ACC_Get_DRDY_Status(&MotionSensor, &acc_ready);
 		LSM6DSR_GYRO_Get_DRDY_Status(&MotionSensor, &gyro_ready);
@@ -600,7 +597,7 @@ void IMUAcquisitionTask(void *argument)
         g_sensors.disp_z  = accel_pos_absolute.z / 1000.0f;
         g_sensors.pressure_hpa  = pressure_hpa;
         g_sensors.temperature_c = temperature_c;
-		setUserLEDTwo(1);
+		//setUserLEDTwo(1);
 		osDelay(IMU_TASK_PERIOD_MS);
 	}
 

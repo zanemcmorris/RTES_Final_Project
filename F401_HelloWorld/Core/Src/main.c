@@ -120,7 +120,6 @@ int main(void)
 	MX_PC13_CS_Init();
   MX_PB4_5_LED_Init();
   MX_USART1_UART_Init();
-  printf("MCU boot OK\r\n");
   //MX_BlueNRG_MS_Init();
   /* USER CODE BEGIN 2 */
 
@@ -157,17 +156,23 @@ int main(void)
   /* add events, ... */
   /* USER CODE END RTOS_EVENTS */
   applicationInit();
+  // GPIO_InitTypeDef probe = {0};
+  // probe.Pin   = GPIO_PIN_1;
+  // probe.Mode  = GPIO_MODE_OUTPUT_PP;
+  // probe.Pull  = GPIO_NOPULL;
+  // probe.Speed = GPIO_SPEED_FREQ_HIGH;
+  // HAL_GPIO_Init(GPIOA, &probe);
+  // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
   /* Start scheduler */
-
   osKernelStart();
 
+  /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
-   //   MX_BlueNRG_MS_Process();
 
     /* USER CODE BEGIN 3 */
   }
@@ -307,7 +312,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_2, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, BLE_CS_Pin|BLE_RSTN_Pin, GPIO_PIN_RESET);
+
+  // /*Configure GPIO pins : PA1 PA2 */
+  // GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_2;
+  // GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  // GPIO_InitStruct.Pull = GPIO_NOPULL;
+  // GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  // HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : BLE_IRQ_Pin */
   GPIO_InitStruct.Pin = BLE_IRQ_Pin;
