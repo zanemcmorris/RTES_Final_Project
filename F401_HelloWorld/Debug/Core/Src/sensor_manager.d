@@ -34,11 +34,11 @@ Core/Src/sensor_manager.o: ../Core/Src/sensor_manager.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h \
+ ../Core/Inc/lsm6dsr_reg.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h \
- ../Core/Inc/lsm6dsr.h ../Core/Inc/lsm6dsr_reg.h ../Core/Inc/lps22hh.h \
- ../Core/Inc/lps22hh_reg.h ../Core/Inc/VL53L0X/vl53l0x_platform.h \
- ../Core/Inc/VL53L0X/vl53l0x_def.h ../Core/Inc/VL53L0X/vl53l0x_device.h \
- ../Core/Inc/VL53L0X/vl53l0x_types.h \
+ ../Core/Inc/lsm6dsr.h ../Core/Inc/lps22hh.h ../Core/Inc/lps22hh_reg.h \
+ ../Core/Inc/VL53L0X/vl53l0x_platform.h ../Core/Inc/VL53L0X/vl53l0x_def.h \
+ ../Core/Inc/VL53L0X/vl53l0x_device.h ../Core/Inc/VL53L0X/vl53l0x_types.h \
  ../Core/Inc/VL53L0X/vl53l0x_platform_log.h \
  ../Core/Inc/VL53L0X/vl53l0x_i2c_platform.h \
  ../Core/Inc/VL53L0X/vl53l0x_api.h \
@@ -80,9 +80,9 @@ Core/Src/sensor_manager.o: ../Core/Src/sensor_manager.c \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h:
+../Core/Inc/lsm6dsr_reg.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h:
 ../Core/Inc/lsm6dsr.h:
-../Core/Inc/lsm6dsr_reg.h:
 ../Core/Inc/lps22hh.h:
 ../Core/Inc/lps22hh_reg.h:
 ../Core/Inc/VL53L0X/vl53l0x_platform.h:

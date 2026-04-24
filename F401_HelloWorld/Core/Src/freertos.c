@@ -246,8 +246,6 @@ void applicationInit(void) {
 	osTimerStart(RPYTimer, msToTicks(2));
 	osTimerStart(altitudeTimer, msToTicks(10));
 
-	//here?
-	//start PWM control for motors
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
@@ -572,7 +570,7 @@ void IMUAcquisitionTask(void *argument) {
 		setUserLEDTwo(0);
 		SensorManager_RunOnce();
 		setUserLEDTwo(1);
-		osDelay(IMU_TASK_PERIOD_MS);
+		osDelay(IMU_SAMPLING_PERIOD_MS);
 	}
 }
 

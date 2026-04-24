@@ -15,8 +15,6 @@
 
 extern osMutexId_t IMUDataMutexID;
 
-#define IMU_SAMPLING_FREQ (LSM6DSR_XL_ODR_104Hz)
-#define IMU_SAMPLING_PERIOD (IMU_SAMPLING_FREQ / 1000.0f)
 
 
 
@@ -343,9 +341,9 @@ static void preprocess_imu_sample(const raw_imu_sample_t *raw, processed_imu_sam
     proc->gyro_y_rps = proc->gyro_y_dps * DEG_TO_RAD;
     proc->gyro_z_rps = proc->gyro_z_dps * DEG_TO_RAD;
 
-    proc->gyro_x_rad_abs += proc->gyro_x_rps * IMU_SAMPLING_PERIOD;
-    proc->gyro_y_rad_abs += proc->gyro_y_rps * IMU_SAMPLING_PERIOD;
-    proc->gyro_z_rad_abs += proc->gyro_z_rps * IMU_SAMPLING_PERIOD;
+    proc->gyro_x_rad_abs += proc->gyro_x_rps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
+    proc->gyro_y_rad_abs += proc->gyro_y_rps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
+    proc->gyro_z_rad_abs += proc->gyro_z_rps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 
 }
 

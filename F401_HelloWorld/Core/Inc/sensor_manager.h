@@ -6,9 +6,11 @@ extern "C" {
 #endif
 
 #include "main.h"
+#include "lsm6dsr_reg.h"
 #include <stdint.h>
 
-#define IMU_TASK_PERIOD_MS (10)
+#define IMU_SAMPLING_FREQ (LSM6DSR_XL_ODR_104Hz)
+#define IMU_SAMPLING_PERIOD_MS (1000.0 / IMU_SAMPLING_FREQ)
 
 #define IMU_CS_PORT  GPIOA
 #define IMU_CS_PIN   GPIO_PIN_8
