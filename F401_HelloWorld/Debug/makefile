@@ -9,18 +9,21 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include USB_DEVICE/Target/subdir.mk
--include USB_DEVICE/App/subdir.mk
 -include Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/subdir.mk
 -include Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F/subdir.mk
 -include Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/subdir.mk
 -include Middlewares/Third_Party/FreeRTOS/Source/subdir.mk
--include Middlewares/ST/STM32_USB_Device_Library/Core/Src/subdir.mk
--include Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/subdir.mk
+-include Middlewares/ST/BlueNRG-MS/utils/subdir.mk
+-include Middlewares/ST/BlueNRG-MS/hci/hci_tl_patterns/Basic/subdir.mk
+-include Middlewares/ST/BlueNRG-MS/hci/controller/subdir.mk
+-include Middlewares/ST/BlueNRG-MS/hci/subdir.mk
 -include Drivers/STM32F4xx_HAL_Driver/Src/subdir.mk
+-include Drivers/BSP/custom/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/VL53L0X/subdir.mk
 -include Core/Src/subdir.mk
+-include BlueNRG_MS/Target/subdir.mk
+-include BlueNRG_MS/App/subdir.mk
 -include objects.mk
 
 ifneq ($(MAKECMDGOALS),clean)

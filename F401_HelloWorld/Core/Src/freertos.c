@@ -54,24 +54,22 @@ osThreadAttr_t imuAcquisitionTaskAttr = { .name = "imuAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536 };
 osThreadId_t imuAcquisitionTaskID;
 
-osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority =
-		osPriorityLow, .stack_size = 1536 };
-osThreadId_t uartCommTaskID;
-
-/*osThreadAttr_t tofAcquisitionTaskAttr = {
- .name = "tofAcquisition",
- .priority = osPriorityNormal,
- .stack_size = 1536
- };
- osThreadId_t tofAcquisitionTaskID;*/
-
 osThreadAttr_t RPYTaskAttr = { .name = "rpyPIDTask", .priority =
-		osPriorityRealtime, .stack_size = 1536 }; //needed?
+		osPriorityRealtime, .stack_size = 1024 }; //needed?
 osThreadId_t RPYTaskID;
 
 osThreadAttr_t altitudeTaskAttr = { .name = "altitudePIDTask", .priority =
-		osPriorityRealtime, .stack_size = 1536 }; //needed?
+		osPriorityRealtime, .stack_size = 1024 }; //needed?
 osThreadId_t altitudeTaskID;
+
+
+osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority =
+		osPriorityLow, .stack_size = 1024 };
+osThreadId_t uartCommTaskID;
+
+osThreadAttr_t bleCommTaskAttr = { .name = "bleComm", .priority =
+		osPriorityLow, .stack_size = 1536 };
+osThreadId_t bleCommTaskID;
 
 const osMutexAttr_t IMUDataMutexAttr = { "IMUDataMutex", // human readable mutex name
 		osMutexRecursive | osMutexPrioInherit,    // attr_bits
@@ -106,6 +104,9 @@ osTimerId_t altitudeTimer;
 static void altitudeTimerCallback(void *argument) {
 	osSemaphoreRelease(altitudeReleaseSemID);
 }
+
+osEventFlagsId_t bleEventFlags;
+
 
 /* USER CODE END PTD */
 
@@ -161,13 +162,14 @@ static float globalAltitudeOuput; //needed? static
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-void applicationInit(void);
+void applicationInit(voidvoid);
 void ledHeartbeatTask(void *argument);
 void uartCommTask(void *argument);
 void IMUAcquisitionTask(void *argument);
 void flightControlTask(void *argument);
 void RPY_PID_task(void *arguments);
 void altitude_PID_task(void *arguments);
+void bluetoothControlTask(void *argument);
 
 /* USER CODE END FunctionPrototypes */
 
@@ -196,8 +198,22 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-void applicationInit(void) {
+
+
+/**
+ * @brief Sets up tasks and other RTOS primitives
+ */
+void applicationInit(void)
+{
+	
+
+	int status = 0;
+	assert(MX_LSM6DSR_Init() == LSM6DSR_OK);
+	assert(MX_LPS22HH_Init() == LPS22HH_OK);
 	assert(SensorManager_Init() == 0);
+
+	bleEventFlags = osEventFlagsNew(NULL); //Create the event flag for BLE task
+	assert(bleEventFlags != NULL);
 
 	ledHeartbeatID = osThreadNew(ledHeartbeatTask, NULL, &ledHeartbeatAttr);
 	assert(ledHeartbeatID != 0);
@@ -208,6 +224,12 @@ void applicationInit(void) {
 	imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL,
 			&imuAcquisitionTaskAttr);
 	assert(imuAcquisitionTaskID != 0);
+	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
+	assert(uartCommTaskID != 0);
+
+	//BLE Thread Create
+	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
+	assert(bleCommTaskID != 0);
 
 //    uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
 //    assert(uartCommTaskID != 0);
@@ -606,4 +628,44 @@ void flightControlTask(void *argument) {
 	}
 }
 
+/*
+Approach 1:
+Since we will be asynchronously sending messages instead of checking the BLE message (polling) every 10msec or something using non-blocking stuff
+1) Trigger an interrupt when the message is received (IRQ - hci_tl_lowlevel_isr) (from Laptop -> MCU)
+2) Parse the message : Example : MOVE RIGHT x,y,z? parse the data, pitch - 10 blah blah need to brainstorm this
+3) Do the necessary stuff and Acknowledge back to Laptop (from MCU -> Laptop)? 
+4) 
+*/
+/**
+ * @brief Adding Primary task for Bluetooth to send recevived data from python to UART 
+ */
+
+ void bluetoothControlTask(void *argument)
+ {
+	printf("Before Init");
+	(void)argument;
+	MX_BlueNRG_MS_Init();
+	// if (BLE_App_Init() != BLE_APP_OK) {
+	// 	printf("BLE_App_Init FAILED\r\n");
+    //     /* Blink LED fast forever to signal failure */
+    //     while (1) {
+    //         HAL_GPIO_TogglePin(USER_LED_1_PORT, USER_LED_1_PIN);
+    //         osDelay(100);
+    //     }
+    // }
+	// printf("BLE OK — advertising as FCU_NODE\r\n");
+	// HAL_GPIO_WritePin(USER_LED_1_PORT, USER_LED_1_PIN, GPIO_PIN_SET);
+    printf("BLE middleware init done\r\n");
+	uint32_t last_telem_tick = 0;
+    uint32_t telem_counter   = 0;
+
+    while (1)
+    {
+		
+        osEventFlagsWait(bleEventFlags, 0x01, osFlagsWaitAny | osFlagsNoClear, 10);
+		osEventFlagsClear(bleEventFlags, 0x01);
+        MX_BlueNRG_MS_Process();   // app layer
+    }
+ }
 /* USER CODE END Application */
+
