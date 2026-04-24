@@ -7,11 +7,11 @@
 
 #include "PID.h"
 
-
-static PID_params_t rollPIDParams = { 1, 1, 1, 0 };
-static PID_params_t pitchPIDParams = { 1, 1, 1, 0 };
-static PID_params_t yawPIDParams = { 1, 1, 1, 0 };
-static PID_params_t altitudePIDParams = { 1, 1, 1, 1654 };
+// enjoy the terms!
+static PID_params_t rollPIDParams = { .4, 0, 0, 0 };
+static PID_params_t pitchPIDParams = { .4, 0, 0, 0 };
+static PID_params_t yawPIDParams = { .4, 0, 0, 0 };
+PID_params_t altitudePIDParams = { .4, 0, 0, 0 };
 
 static float globalAltitudeOuput; //needed? static
 // Filter coefficient for the D-term (0.0 to 1.0)
@@ -47,10 +47,10 @@ void writeToMotors(int motorFR, int motorFL, int motorBR, int motorBL) {
 
 
 	//motor vals are between 0-2099, y = 2099/100 * x
-	uint32_t frSetting = 20.99 * motorFR;
-	uint32_t flSetting = 20.99 * motorFL;
-	uint32_t brSetting = 20.99 * motorBR;
-	uint32_t blSetting = 20.99 * motorBL;
+	uint32_t frSetting = 2099 * motorFR;
+	uint32_t flSetting = 2099 * motorFL;
+	uint32_t brSetting = 2099 * motorBR;
+	uint32_t blSetting = 2099 * motorBL;
 
 
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, blSetting);

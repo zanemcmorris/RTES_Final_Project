@@ -14,6 +14,7 @@
 #include "vl53l0x_api.h"
 
 extern osMutexId_t IMUDataMutexID;
+extern osMutexId_t altitudeDataMutexID;
 
 static volatile debug_output_mode_t g_debug_output_mode = DEBUG_OUT_STAT;
 
@@ -785,7 +786,9 @@ void SensorManager_RunOnce(void) {
 	g_raw_baro.pressure_ready = press_ready;
 	g_raw_baro.temperature_ready = temp_ready;
 
+	osMutexAcquire(altitudeDataMutexID, osWaitForever);
 	preprocess_baro_sample(&g_raw_baro, &g_processed_baro);
+	osMutexRelease(altitudeDataMutexID);
 
 	/* Keeping all debug TX behavior exactly as it is now: still commented */
 	/* imu_uart_send_raw_line(&accel, &gyro); */

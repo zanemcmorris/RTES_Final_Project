@@ -35,6 +35,8 @@
 #define USER_LED_1_PIN  (GPIO_PIN_4)
 #define USER_LED_2_PIN  (GPIO_PIN_5)
 
+#define ALTITUDE_OFFSET_M (1)
+
 extern TIM_HandleTypeDef htim4;
 extern processed_imu_sample_t g_processed_imu;
 extern processed_baro_sample_t g_processed_baro;
@@ -46,10 +48,6 @@ extern processed_baro_sample_t g_processed_baro;
 osThreadAttr_t ledHeartbeatAttr = { .name = "ledHeartbeat", .priority =
 		osPriorityLow };
 osThreadId_t ledHeartbeatID;
-
-osThreadAttr_t flightControlTaskAttr = { .name = "flightControl", .priority =
-		osPriorityRealtime };
-osThreadId_t flightControlTaskID;
 
 osThreadAttr_t imuAcquisitionTaskAttr = { .name = "imuAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536 };
@@ -106,6 +104,7 @@ static void altitudeTimerCallback(void *argument) {
 }
 
 osEventFlagsId_t bleEventFlags;
+extern PID_params_t altitudePIDParams;
 
 /* USER CODE END PTD */
 
@@ -167,6 +166,7 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 void applicationInit(void) {
 
 	int status = 0;
+
 	assert(MX_LSM6DSR_Init() == LSM6DSR_OK);
 	assert(MX_LPS22HH_Init() == LPS22HH_OK);
 	assert(SensorManager_Init() == 0);
@@ -250,6 +250,13 @@ void altitude_PID_task(void *arguments) {
 	Altitude_PID_State_t altPIDState = { .altitudeIntegral = 0,
 			.altitudeLastError = 0, .altDerivativeFiltered = 0,
 			.currentAltitude = 0, .lastBaroTimestampUs = 0, .isFirstRun = true };
+
+	while(altitudePIDParams.setpoint <= ALTITUDE_OFFSET_M){
+		osMutexAcquire(altitudeDataMutexID, osWaitForever);
+		altitudePIDParams.setpoint = g_processed_baro.altitude_m + ALTITUDE_OFFSET_M;
+		osMutexRelease(altitudeDataMutexID);
+	}
+
 	for (;;) {
 		//barometer can read 100-200 hz, lidar ~30hz
 		//synchronization for 100hz release from timer
@@ -295,38 +302,6 @@ void IMUAcquisitionTask(void *argument) {
 		SensorManager_RunOnce();
 		setUserLEDTwo(1);
 		osDelay(IMU_SAMPLING_PERIOD_MS);
-	}
-}
-
-/*void flightControlTask(void *argument)
- {
- (void)argument;
- while (1)
- {
- osDelay(100);
- }
- }*/
-
-void flightControlTask(void *argument) {
-	(void) argument;
-
-	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
-	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
-	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
-
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
-
-	while (1) {
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
-		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
-
-		osDelay(100);
 	}
 }
 

@@ -43,10 +43,10 @@
 
 
 typedef struct {
-	int32_t kp;
-	int32_t ki;
-	int32_t kd;
-	int32_t setpoint; //in struct? cause it will need a mutex around it
+	float kp;
+	float ki;
+	float kd;
+	float setpoint; //in struct? cause it will need a mutex around it
 } PID_params_t;
 
 typedef struct {
