@@ -1,0 +1,28 @@
+# STM32CubeIDE build output folders
+F401_HelloWorld/Debug/
+F401_HelloWorld/Release/
+F401_HelloWorld/build/
+F401_HelloWorld/Build/
+
+# Object/dependency/listing files
+*.o
+*.d
+*.list
+*.lst
+*.su
+*.cyclo
+
+# Compiled firmware/output artifacts
+*.elf
+*.bin
+*.hex
+*.map
+*.siz
+*.size
+
+# Misc generated/debug output
+*.disasm
+*.out
+
+# Optional: local IDE/workspace metadata
+F401_HelloWorld/.metadata/
