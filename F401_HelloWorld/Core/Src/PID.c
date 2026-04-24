@@ -53,10 +53,10 @@ void writeToMotors(int motorFR, int motorFL, int motorBR, int motorBL) {
 	uint32_t blSetting = 20.99 * motorBL;
 
 
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, frSetting);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, flSetting);
+	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, blSetting);
+	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, frSetting);
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, brSetting);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, blSetting);
+	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, flSetting);
 }
 
 
@@ -161,6 +161,8 @@ void RPY_RunControlLoop(RPY_PID_State_t *state){
 		motorBR = 100;
 	if (motorBL > 100)
 		motorBL = 100;
+
+	// Post to global motor data
 
 	writeToMotors(motorFR, motorFL, motorBR, motorBL);
 }

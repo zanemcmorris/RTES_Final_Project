@@ -63,13 +63,12 @@ osThreadAttr_t altitudeTaskAttr = { .name = "altitudePIDTask", .priority =
 		osPriorityRealtime, .stack_size = 1024 }; //needed?
 osThreadId_t altitudeTaskID;
 
-
 osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority =
 		osPriorityLow, .stack_size = 1024 };
 osThreadId_t uartCommTaskID;
 
-osThreadAttr_t bleCommTaskAttr = { .name = "bleComm", .priority =
-		osPriorityLow, .stack_size = 1536 };
+osThreadAttr_t bleCommTaskAttr = { .name = "bleComm", .priority = osPriorityLow,
+		.stack_size = 1536 };
 osThreadId_t bleCommTaskID;
 
 const osMutexAttr_t IMUDataMutexAttr = { "IMUDataMutex", // human readable mutex name
@@ -107,7 +106,6 @@ static void altitudeTimerCallback(void *argument) {
 }
 
 osEventFlagsId_t bleEventFlags;
-
 
 /* USER CODE END PTD */
 
@@ -163,13 +161,10 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
-
 /**
  * @brief Sets up tasks and other RTOS primitives
  */
-void applicationInit(void)
-{
-	
+void applicationInit(void) {
 
 	int status = 0;
 	assert(MX_LSM6DSR_Init() == LSM6DSR_OK);
@@ -181,9 +176,6 @@ void applicationInit(void)
 
 	ledHeartbeatID = osThreadNew(ledHeartbeatTask, NULL, &ledHeartbeatAttr);
 	assert(ledHeartbeatID != 0);
-
-//    flightControlTaskID = osThreadNew(flightControlTask, NULL, &flightControlTaskAttr);
-//    assert(flightControlTaskID != 0);
 
 	imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL,
 			&imuAcquisitionTaskAttr);
@@ -215,7 +207,6 @@ void applicationInit(void)
 	altitudeReleaseSemID = osSemaphoreNew(1, 1, NULL);
 	assert(altitudeReleaseSemID != NULL);
 
-	//set up and create PID tasks
 	RPYTaskID = osThreadNew(RPY_PID_task, NULL, &RPYTaskAttr);
 	assert(RPYTaskID != 0);
 
@@ -225,9 +216,8 @@ void applicationInit(void)
 	//configure PID sequencer timers
 	RPYTimer = osTimerNew(RPYTimerCallback, osTimerPeriodic, NULL, NULL);
 	altitudeTimer = osTimerNew(altitudeTimerCallback, osTimerPeriodic, NULL,
-			NULL);
+	NULL);
 
-	//asserts?
 	//start PID sequencer timers
 	osTimerStart(RPYTimer, msToTicks(2));
 	osTimerStart(altitudeTimer, msToTicks(10));
@@ -239,24 +229,13 @@ void applicationInit(void)
 
 }
 
-
-
-
-
 void RPY_PID_task(void *arguments) {
 	//imu read 417 hz
 
-	RPY_PID_State_t rpyPIDState = {
-	        .rollIntegral = 0,
-	        .rollLastError = 0,
-	        .pitchIntegral = 0,
-	        .pitchLastError = 0,
-	        .yawIntegral = 0,
-	        .yawLastError = 0,
-	        .lastTimestampUs = 0,
-	        .isFirstRun = true,
-	        .currentState = {0}
-	    };
+	RPY_PID_State_t rpyPIDState = { .rollIntegral = 0, .rollLastError = 0,
+			.pitchIntegral = 0, .pitchLastError = 0, .yawIntegral = 0,
+			.yawLastError = 0, .lastTimestampUs = 0, .isFirstRun = true,
+			.currentState = { 0 } };
 
 	for (;;) {
 		//have GPIO pin go high here, then low at the very end of task and measure Ci with scope
@@ -266,30 +245,18 @@ void RPY_PID_task(void *arguments) {
 	}
 }
 
-
 void altitude_PID_task(void *arguments) {
 
-	Altitude_PID_State_t altPIDState = {
-			.altitudeIntegral = 0,
-			.altitudeLastError = 0,
-			.altDerivativeFiltered = 0,
-			.currentAltitude = 0,
-			.lastBaroTimestampUs = 0,
-			.isFirstRun = true
-		};
-
-
+	Altitude_PID_State_t altPIDState = { .altitudeIntegral = 0,
+			.altitudeLastError = 0, .altDerivativeFiltered = 0,
+			.currentAltitude = 0, .lastBaroTimestampUs = 0, .isFirstRun = true };
 	for (;;) {
-
-		//turn led on here, then off at the very end of task and measure Ci with scope
-
 		//barometer can read 100-200 hz, lidar ~30hz
 		//synchronization for 100hz release from timer
 		osSemaphoreAcquire(altitudeReleaseSemID, PID_SEMAPHORE_TIMEOUT); //timeout val ok?
 		Altitude_RunControlLoop(&altPIDState);
 	}
 }
-
 
 void ledHeartbeatTask(void *argument) {
 	(void) argument;
@@ -364,43 +331,42 @@ void flightControlTask(void *argument) {
 }
 
 /*
-Approach 1:
-Since we will be asynchronously sending messages instead of checking the BLE message (polling) every 10msec or something using non-blocking stuff
-1) Trigger an interrupt when the message is received (IRQ - hci_tl_lowlevel_isr) (from Laptop -> MCU)
-2) Parse the message : Example : MOVE RIGHT x,y,z? parse the data, pitch - 10 blah blah need to brainstorm this
-3) Do the necessary stuff and Acknowledge back to Laptop (from MCU -> Laptop)? 
-4) 
-*/
+ Approach 1:
+ Since we will be asynchronously sending messages instead of checking the BLE message (polling) every 10msec or something using non-blocking stuff
+ 1) Trigger an interrupt when the message is received (IRQ - hci_tl_lowlevel_isr) (from Laptop -> MCU)
+ 2) Parse the message : Example : MOVE RIGHT x,y,z? parse the data, pitch - 10 blah blah need to brainstorm this
+ 3) Do the necessary stuff and Acknowledge back to Laptop (from MCU -> Laptop)?
+ 4)
+ */
 /**
  * @brief Adding Primary task for Bluetooth to send recevived data from python to UART 
  */
 
- void bluetoothControlTask(void *argument)
- {
+void bluetoothControlTask(void *argument) {
 	printf("Before Init");
-	(void)argument;
+	(void) argument;
 	MX_BlueNRG_MS_Init();
 	// if (BLE_App_Init() != BLE_APP_OK) {
 	// 	printf("BLE_App_Init FAILED\r\n");
-    //     /* Blink LED fast forever to signal failure */
-    //     while (1) {
-    //         HAL_GPIO_TogglePin(USER_LED_1_PORT, USER_LED_1_PIN);
-    //         osDelay(100);
-    //     }
-    // }
+	//     /* Blink LED fast forever to signal failure */
+	//     while (1) {
+	//         HAL_GPIO_TogglePin(USER_LED_1_PORT, USER_LED_1_PIN);
+	//         osDelay(100);
+	//     }
+	// }
 	// printf("BLE OK — advertising as FCU_NODE\r\n");
 	// HAL_GPIO_WritePin(USER_LED_1_PORT, USER_LED_1_PIN, GPIO_PIN_SET);
-    printf("BLE middleware init done\r\n");
+	printf("BLE middleware init done\r\n");
 	uint32_t last_telem_tick = 0;
-    uint32_t telem_counter   = 0;
+	uint32_t telem_counter = 0;
 
-    while (1)
-    {
-		
-        osEventFlagsWait(bleEventFlags, 0x01, osFlagsWaitAny | osFlagsNoClear, 10);
+	while (1) {
+
+		osEventFlagsWait(bleEventFlags, 0x01, osFlagsWaitAny | osFlagsNoClear,
+				10);
 		osEventFlagsClear(bleEventFlags, 0x01);
-        MX_BlueNRG_MS_Process();   // app layer
-    }
- }
+		MX_BlueNRG_MS_Process();   // app layer
+	}
+}
 /* USER CODE END Application */
 
