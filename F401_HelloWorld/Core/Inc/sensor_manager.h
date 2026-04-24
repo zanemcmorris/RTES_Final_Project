@@ -7,6 +7,8 @@ extern "C" {
 
 #include "main.h"
 #include "lsm6dsr_reg.h"
+#include "lsm6dsr.h"
+#include "lps22hh.h"
 #include <stdint.h>
 
 #define IMU_SAMPLING_FREQ (LSM6DSR_XL_ODR_104Hz)
@@ -64,6 +66,14 @@ typedef struct
     float accel_x_mps2;
     float accel_y_mps2;
     float accel_z_mps2;
+
+    float vel_x_mps;
+    float vel_y_mps;
+    float vel_z_mps;
+
+    float pos_x_m;
+    float pos_y_m;
+    float pos_z_m;
 
     float gyro_x_dps;
     float gyro_y_dps;
@@ -124,6 +134,8 @@ typedef struct
 
 int32_t SensorManager_Init(void);
 void SensorManager_RunOnce(void);
+int32_t MX_LSM6DSR_Init(void);
+int32_t MX_LPS22HH_Init(void);
 
 #ifdef __cplusplus
 }

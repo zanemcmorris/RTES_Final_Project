@@ -30,6 +30,7 @@ extern "C" {
 #include "stm32f4xx_hal.h"
 
 #include "hci_tl_interface.h"
+#include "custom.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 

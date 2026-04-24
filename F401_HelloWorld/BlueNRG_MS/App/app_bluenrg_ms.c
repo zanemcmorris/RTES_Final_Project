@@ -40,9 +40,12 @@ typedef struct {
     float temperature_c;
 } SensorData_t;
 
-extern volatile SensorData_t g_sensors;
+//extern volatile SensorData_t g_sensors;
 
 /* USER CODE BEGIN Includes */
+#include "sensor_manager.h"
+extern volatile processed_imu_sample_t g_processed_imu;
+extern volatile processed_baro_sample_t g_processed_baro;
 
 /* USER CODE END Includes */
 
@@ -232,7 +235,7 @@ void MX_BlueNRG_MS_Process(void)
 
   User_Process();
   hci_user_evt_proc();
-  
+
 
   /* USER CODE BEGIN BlueNRG_MS_Process_PostTreatment */
   static uint32_t last_telem_tick = 0;
@@ -247,19 +250,19 @@ if (connected && notification_enabled)
         uint8_t buf[20];
         uint16_t ts = (uint16_t)(now & 0xFFFF);
 
-     
+
 
         if (pkt_toggle == 0)
         {
-            
+
             // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
             /* Packet A: id(1) + ts(2) + ax(4) + ay(4) + az(4) + pressure(4) = 19 */
             buf[0] = 0x41;
             memcpy(buf + 1,  &ts,                    2);
-            memcpy(buf + 3,  &g_sensors.ax_g,         4);
-            memcpy(buf + 7,  &g_sensors.ay_g,         4);
-            memcpy(buf + 11, &g_sensors.az_g,         4);
-            memcpy(buf + 15, &g_sensors.pressure_hpa, 4);
+            memcpy(buf + 3,  &g_processed_imu.accel_x_g,         4);
+            memcpy(buf + 7,  &g_processed_imu.accel_y_g,         4);
+            memcpy(buf + 11, &g_processed_imu.accel_z_g,         4);
+            memcpy(buf + 15, &g_processed_baro.pressure_hpa, 4);
            // printf("Sent the package 1\n");
           //  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
             sendData(buf, 19);
@@ -269,20 +272,20 @@ if (connected && notification_enabled)
             /* Packet B: id(1) + ts(2) + gx(4) + gy(4) + gz(4) + gz_integrated(4) = 19 */
             buf[0] = 0x42;
             memcpy(buf + 1,  &ts,                2);
-            memcpy(buf + 3,  &g_sensors.gx_dps, 4);
-            memcpy(buf + 7,  &g_sensors.gy_dps, 4);
-            memcpy(buf + 11, &g_sensors.gz_dps, 4);
-            memcpy(buf + 15, &g_sensors.angle_z, 4);  // integrated yaw, useful for the deg plot
+            memcpy(buf + 3,  &g_processed_imu.gyro_x_dps, 4);
+            memcpy(buf + 7,  &g_processed_imu.gyro_y_dps, 4);
+            memcpy(buf + 11, &g_processed_imu.gyro_z_dps, 4);
+            memcpy(buf + 15, &g_processed_imu.gyro_z_rad_abs, 4);  // integrated yaw, useful for the deg plot
             // printf("Sent the package 2\n");
             // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
             sendData(buf, 19);
         }else{
             buf[0] = 0x43;
             memcpy(buf + 1,  &ts,               2);
-            memcpy(buf + 3,  &g_sensors.vel_x,  4);
-            memcpy(buf + 7,  &g_sensors.vel_y,  4);
-            memcpy(buf + 11, &g_sensors.vel_z,  4);
-            memcpy(buf + 15, &g_sensors.disp_z, 4);
+            memcpy(buf + 3,  &g_processed_imu.vel_x_mps,  4);
+            memcpy(buf + 7,  &g_processed_imu.vel_y_mps,  4);
+            memcpy(buf + 11, &g_processed_imu.vel_z_mps,  4);
+            memcpy(buf + 15, &g_processed_imu.pos_z_m, 4);
             // printf("Sent the package 3\n");
             // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
             sendData(buf, 19);
@@ -295,7 +298,7 @@ if (connected && notification_enabled)
         }else{
             pkt_toggle = 0;
         }
-       
+
     }
 }
 

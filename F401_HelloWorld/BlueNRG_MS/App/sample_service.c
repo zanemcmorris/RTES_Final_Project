@@ -262,7 +262,7 @@ void Attribute_Modified_CB(uint16_t handle, uint8_t data_length, uint8_t *att_da
   if(handle == RXCharHandle + 1){
     //HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
 
-   // printf("Package ACK\n");    
+   // printf("Package ACK\n");
    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
     receiveData(att_data, data_length);
   } else if (handle == TXCharHandle + 2) {

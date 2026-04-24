@@ -54,6 +54,59 @@ osThreadAttr_t imuAcquisitionTaskAttr = { .name = "imuAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536 };
 osThreadId_t imuAcquisitionTaskID;
 
+osThreadAttr_t RPYTaskAttr = { .name = "rpyPIDTask", .priority =
+		osPriorityRealtime, .stack_size = 1024 }; //needed?
+osThreadId_t RPYTaskID;
+
+osThreadAttr_t altitudeTaskAttr = { .name = "altitudePIDTask", .priority =
+		osPriorityRealtime, .stack_size = 1024 }; //needed?
+osThreadId_t altitudeTaskID;
+
+
+osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority =
+		osPriorityLow, .stack_size = 1024 };
+osThreadId_t uartCommTaskID;
+
+osThreadAttr_t bleCommTaskAttr = { .name = "bleComm", .priority =
+		osPriorityLow, .stack_size = 1536 };
+osThreadId_t bleCommTaskID;
+
+const osMutexAttr_t IMUDataMutexAttr = { "IMUDataMutex", // human readable mutex name
+		osMutexRecursive | osMutexPrioInherit,    // attr_bits
+		NULL,                                     // memory for control block
+		0U                                        // size for control block
+		};
+osMutexId_t IMUDataMutexID;
+
+const osMutexAttr_t altitudeDataMutexAttr = { "altitudeDataMutex", // human readable mutex name
+		osMutexRecursive | osMutexPrioInherit,    // attr_bits
+		NULL,                                     // memory for control block
+		0U                                        // size for control block
+		};
+osMutexId_t altitudeDataMutexID;
+
+const osMutexAttr_t outputThrustDataMutexAttr = { "outputThrustDataMutex", // human readable mutex name
+		osMutexRecursive | osMutexPrioInherit,    // attr_bits
+		NULL,                                     // memory for control block
+		0U                                        // size for control block
+		};
+osMutexId_t outputThrustDataMutexID;
+
+osSemaphoreId_t RPYReleaseSemID;
+osSemaphoreId_t altitudeReleaseSemID;
+
+osTimerId_t RPYTimer;
+static void RPYTimerCallback(void *argument) {
+	osSemaphoreRelease(RPYReleaseSemID);
+}
+
+osTimerId_t altitudeTimer;
+static void altitudeTimerCallback(void *argument) {
+	osSemaphoreRelease(altitudeReleaseSemID);
+}
+
+osEventFlagsId_t bleEventFlags;
+
 
 /* USER CODE END PTD */
 
@@ -110,12 +163,12 @@ static float globalAltitudeOuput; //needed? static
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 void applicationInit(voidvoid);
-void ledHeartbeatTask(void *argumentvoid *argument);
-void uartCommTask(void *argumentvoid *argument);
-void IMUAcquisitionTask(void *argumentvoid *argument);
+void ledHeartbeatTask(void *argument);
+void uartCommTask(void *argument);
+void IMUAcquisitionTask(void *argument);
 void flightControlTask(void *argument);
 void RPY_PID_task(void *arguments);
-void altitude_PID_task(void *argumentsvoid *argument);
+void altitude_PID_task(void *arguments);
 void bluetoothControlTask(void *argument);
 
 /* USER CODE END FunctionPrototypes */
@@ -175,8 +228,8 @@ void applicationInit(void)
 	assert(uartCommTaskID != 0);
 
 	//BLE Thread Create
-	bleTaskID = osThreadNew(bluetoothControlTask, NULL, &bleTaskAttr);
-	assert(bleTaskID != 0);
+	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
+	assert(bleCommTaskID != 0);
 
 //    uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
 //    assert(uartCommTaskID != 0);
@@ -615,3 +668,4 @@ Since we will be asynchronously sending messages instead of checking the BLE mes
     }
  }
 /* USER CODE END Application */
+
