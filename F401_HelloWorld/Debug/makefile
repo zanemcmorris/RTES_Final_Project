@@ -17,10 +17,16 @@ RM := rm -rf
 -include Middlewares/Third_Party/FreeRTOS/Source/subdir.mk
 -include Middlewares/ST/STM32_USB_Device_Library/Core/Src/subdir.mk
 -include Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/subdir.mk
+-include Middlewares/ST/BlueNRG-MS/utils/subdir.mk
+-include Middlewares/ST/BlueNRG-MS/hci/hci_tl_patterns/Basic/subdir.mk
+-include Middlewares/ST/BlueNRG-MS/hci/controller/subdir.mk
+-include Middlewares/ST/BlueNRG-MS/hci/subdir.mk
 -include Drivers/STM32F4xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/VL53L0X/subdir.mk
 -include Core/Src/subdir.mk
+-include BlueNRG_MS/Target/subdir.mk
+-include BlueNRG_MS/App/subdir.mk
 -include objects.mk
 
 ifneq ($(MAKECMDGOALS),clean)
