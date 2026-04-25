@@ -22,6 +22,9 @@ static LSM6DSR_Object_t MotionSensor;
 static LPS22HH_Object_t BaroSensor;
 static VL53L0X_Dev_t g_vl53l0x_dev;
 
+static volatile uint8_t g_spi2_dma_done = 0;
+static volatile uint8_t g_spi2_dma_error = 0;
+
 static spi_device_t imu_dev = { .hspi = &hspi2, .cs_port = IMU_CS_PORT,
 		.cs_pin = IMU_CS_PIN };
 static spi_device_t baro_dev = { .hspi = &hspi2, .cs_port = BARO_CS_PORT,
@@ -75,6 +78,22 @@ static void spi_dev_deselect(spi_device_t *dev) {
 	HAL_GPIO_WritePin(dev->cs_port, dev->cs_pin, GPIO_PIN_SET);
 }
 
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+	if (hspi->Instance == SPI2)
+	{
+		g_spi2_dma_done = 1;
+	}
+}
+
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+	if (hspi->Instance == SPI2)
+	{
+		g_spi2_dma_error = 1;
+	}
+}
+
 static int32_t BSP_SPI2_Init(void) {
 	spi2_deselect_all();
 	return 0;
@@ -89,6 +108,7 @@ static int32_t spi_bus_read_reg(spi_device_t *dev, uint8_t reg, uint8_t *pData,
 		uint16_t Length) {
 	uint8_t txbuf[32];
 	uint8_t rxbuf[32];
+	uint32_t timeout_start;
 
 	if (Length == 0 || Length > (sizeof(txbuf) - 1))
 		return LSM6DSR_ERROR;
@@ -97,15 +117,33 @@ static int32_t spi_bus_read_reg(spi_device_t *dev, uint8_t reg, uint8_t *pData,
 	memset(&txbuf[1], 0x00, Length);
 	memset(rxbuf, 0x00, Length + 1);
 
+	g_spi2_dma_done = 0;
+	g_spi2_dma_error = 0;
+
 	spi_dev_select(dev);
 
-	if (HAL_SPI_TransmitReceive(dev->hspi, txbuf, rxbuf, Length + 1, 100)
+	if (HAL_SPI_TransmitReceive_DMA(dev->hspi, txbuf, rxbuf, Length + 1)
 			!= HAL_OK) {
 		spi_dev_deselect(dev);
 		return LSM6DSR_ERROR;
 	}
 
+	timeout_start = HAL_GetTick();
+
+	while (g_spi2_dma_done == 0 && g_spi2_dma_error == 0) {
+		if ((HAL_GetTick() - timeout_start) > 100) {
+			HAL_SPI_Abort(dev->hspi);
+			spi_dev_deselect(dev);
+			return LSM6DSR_ERROR;
+		}
+	}
+
 	spi_dev_deselect(dev);
+
+	if (g_spi2_dma_error != 0) {
+		return LSM6DSR_ERROR;
+	}
+
 	memcpy(pData, &rxbuf[1], Length);
 	return LSM6DSR_OK;
 }
