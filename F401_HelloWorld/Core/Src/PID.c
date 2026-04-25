@@ -8,8 +8,8 @@
 #include "PID.h"
 
 // enjoy the terms!
-static PID_params_t rollPIDParams = { .35, .08, .01, 0 };
-static PID_params_t pitchPIDParams = { .35, .08, .01, 0 };
+static PID_params_t rollPIDParams = { .1, 0, 0, 0 }; // was .25,.05,.005
+static PID_params_t pitchPIDParams = { .1, 0, 0, 0 };
 static PID_params_t yawPIDParams = { .6, .08, .01, 0 };
 PID_params_t altitudePIDParams = { .1, 0, 0, 0 };
 
@@ -80,8 +80,11 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 	if (dt <= 0.0f || dt > 0.05f)
 		dt = 0.002f;
 
-	state->currentState.roll = currentProcessedIMU.gyro_x_rad_abs;
-	state->currentState.pitch = currentProcessedIMU.gyro_y_rad_abs;
+//	state->currentState.roll = currentProcessedIMU.gyro_x_rad_abs;
+//	state->currentState.pitch = currentProcessedIMU.gyro_y_rad_abs;
+
+	state->currentState.roll = currentProcessedIMU.combined_roll;
+	state->currentState.pitch = currentProcessedIMU.combined_pitch;
 	state->currentState.yaw = currentProcessedIMU.gyro_z_rad_abs;
 
 	//get current roll error

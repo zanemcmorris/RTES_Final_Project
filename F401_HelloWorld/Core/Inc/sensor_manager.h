@@ -11,7 +11,7 @@ extern "C" {
 #include "lps22hh.h"
 #include <stdint.h>
 
-#define IMU_SAMPLING_FREQ (LSM6DSR_XL_ODR_104Hz)
+#define IMU_SAMPLING_FREQ (104)
 #define IMU_SAMPLING_PERIOD_MS (1000.0 / IMU_SAMPLING_FREQ)
 
 #define IMU_CS_PORT  GPIOA
@@ -63,9 +63,9 @@ typedef struct
     float accel_y_g;
     float accel_z_g;
 
+    /* Acceleromter-driven measurements of RP*/
     float accel_roll;
     float accel_pitch;
-    float accel_yaw;
 
     float accel_x_mps2;
     float accel_y_mps2;
@@ -90,6 +90,9 @@ typedef struct
     float gyro_x_rad_abs;
     float gyro_y_rad_abs;
     float gyro_z_rad_abs;
+
+    float combined_roll;
+    float combined_pitch;
 } processed_imu_sample_t;
 
 typedef struct

@@ -117,6 +117,10 @@ extern PID_params_t altitudePIDParams;
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 #define msToTicks(x) ((x * osKernelGetTickFreq()) / 1000)
+static uint32_t micros(void) {
+	return (uint32_t) ((HAL_GetTick() * 1000U)
+			+ ((SysTick->LOAD - SysTick->VAL) * 1000U) / (SysTick->LOAD + 1U));
+}
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -168,32 +172,12 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 void applicationInit(void) {
 
 	int status = 0;
-
-	assert(MX_LSM6DSR_Init() == LSM6DSR_OK);
-	assert(MX_LPS22HH_Init() == LPS22HH_OK);
 	assert(SensorManager_Init() == 0);
 
+	// Primitive creation
 	bleEventFlags = osEventFlagsNew(NULL); //Create the event flag for BLE task
 	assert(bleEventFlags != NULL);
 
-	ledHeartbeatID = osThreadNew(ledHeartbeatTask, NULL, &ledHeartbeatAttr);
-	assert(ledHeartbeatID != 0);
-
-	imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL,
-			&imuAcquisitionTaskAttr);
-	assert(imuAcquisitionTaskID != 0);
-	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
-	assert(uartCommTaskID != 0);
-
-	//BLE Thread Create
-	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
-	assert(bleCommTaskID != 0);
-
-//    uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
-//    assert(uartCommTaskID != 0);
-
-	//------
-	//set up mutexes and sempahores for PID
 	IMUDataMutexID = osMutexNew(&IMUDataMutexAttr);
 	assert(IMUDataMutexID != NULL);
 
@@ -208,6 +192,20 @@ void applicationInit(void) {
 
 	altitudeReleaseSemID = osSemaphoreNew(1, 1, NULL);
 	assert(altitudeReleaseSemID != NULL);
+
+	// Thread creation
+	ledHeartbeatID = osThreadNew(ledHeartbeatTask, NULL, &ledHeartbeatAttr);
+	assert(ledHeartbeatID != 0);
+
+	imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL,
+			&imuAcquisitionTaskAttr);
+	assert(imuAcquisitionTaskID != 0);
+
+	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
+	assert(uartCommTaskID != 0);
+
+	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
+	assert(bleCommTaskID != 0);
 
 	RPYTaskID = osThreadNew(RPY_PID_task, NULL, &RPYTaskAttr);
 	assert(RPYTaskID != 0);
@@ -243,7 +241,10 @@ void RPY_PID_task(void *arguments) {
 		//have GPIO pin go high here, then low at the very end of task and measure Ci with scope
 		//synchronization for 500 hz (2 ms period) from RTOS timer
 		osSemaphoreAcquire(RPYReleaseSemID, PID_SEMAPHORE_TIMEOUT); //determine proper timeout val
+		int start = micros();
 		RPY_RunControlLoop(&rpyPIDState);
+		int end = micros();
+		int diff = end - start;
 	}
 }
 
@@ -253,9 +254,10 @@ void altitude_PID_task(void *arguments) {
 			.altitudeLastError = 0, .altDerivativeFiltered = 0,
 			.currentAltitude = 0, .lastBaroTimestampUs = 0, .isFirstRun = true };
 
-	while(altitudePIDParams.setpoint <= ALTITUDE_OFFSET_M){
+	while (altitudePIDParams.setpoint <= ALTITUDE_OFFSET_M) {
 		osMutexAcquire(altitudeDataMutexID, osWaitForever);
-		altitudePIDParams.setpoint = g_processed_baro.altitude_m + ALTITUDE_OFFSET_M;
+		altitudePIDParams.setpoint = g_processed_baro.altitude_m
+				+ ALTITUDE_OFFSET_M;
 		osMutexRelease(altitudeDataMutexID);
 	}
 
@@ -263,7 +265,10 @@ void altitude_PID_task(void *arguments) {
 		//barometer can read 100-200 hz, lidar ~30hz
 		//synchronization for 100hz release from timer
 		osSemaphoreAcquire(altitudeReleaseSemID, PID_SEMAPHORE_TIMEOUT); //timeout val ok?
+		int start = micros();
 		Altitude_RunControlLoop(&altPIDState);
+		int end = micros();
+		volatile int diff = end - start;
 	}
 }
 
@@ -287,21 +292,15 @@ void uartCommTask(void *argument) {
 	}
 }
 
-/*void ToFAcquisitionTask(void *argument)
- {
- (void)argument;
- while (1)
- {
- osDelay(100);
- }
- }*/
-
 void IMUAcquisitionTask(void *argument) {
 	(void) argument;
 
 	while (1) {
 		setUserLEDTwo(0);
+		int start = micros();
 		SensorManager_RunOnce();
+		int end = micros();
+		int diff = end - start;
 		setUserLEDTwo(1);
 		osDelay(IMU_SAMPLING_PERIOD_MS);
 	}
