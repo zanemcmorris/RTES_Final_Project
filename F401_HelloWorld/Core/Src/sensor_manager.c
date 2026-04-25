@@ -195,14 +195,14 @@ int32_t MX_LSM6DSR_Init(void) {
 		return LSM6DSR_ERROR;
 
 	if (LSM6DSR_ACC_SetOutputDataRate(&MotionSensor,
-			IMU_SAMPLING_FREQ) != LSM6DSR_OK)
+			LSM6DSR_XL_ODR_104Hz) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 	if (LSM6DSR_ACC_SetFullScale(&MotionSensor, fullScale) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
 	if (LSM6DSR_GYRO_SetOutputDataRate(&MotionSensor,
-			IMU_SAMPLING_FREQ) != LSM6DSR_OK)
-		return LSM6DSR_ERROR;
+			LSM6DSR_XL_ODR_104Hz) != LSM6DSR_OK)
+		return LSM6DSR_ERROR; // TODO: Make sure these enum defns match the #defined period and freq
 	if (LSM6DSR_GYRO_SetFullScale(&MotionSensor, LSM6DSR_250dps) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
@@ -328,7 +328,7 @@ static void preprocess_imu_sample(const raw_imu_sample_t *raw,
 	proc->pos_y_m = proc->vel_y_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 	proc->pos_z_m = proc->vel_z_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 
-	// milli-dps to dps
+	// milli-dps to dps with gyro calibration remove
 	proc->gyro_x_dps = (raw->gyro_x_mdps - g_gyro_bias_x_mdps) / 1000.0f;
 	proc->gyro_y_dps = (raw->gyro_y_mdps - g_gyro_bias_y_mdps) / 1000.0f;
 	proc->gyro_z_dps = (raw->gyro_z_mdps - g_gyro_bias_z_mdps) / 1000.0f;
@@ -339,18 +339,22 @@ static void preprocess_imu_sample(const raw_imu_sample_t *raw,
 	proc->gyro_z_rps = proc->gyro_z_dps * DEG_TO_RAD;
 
 	// Riemann sum rps (rad per second * t = radian)
-	proc->gyro_x_rad_abs += proc->gyro_x_rps
+	// Also with combined_roll and pitch feedback
+	proc->gyro_x_rad_abs = proc->combined_roll + proc->gyro_x_rps
 			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
-	proc->gyro_y_rad_abs += proc->gyro_y_rps
+	proc->gyro_y_rad_abs = proc->combined_pitch + proc->gyro_y_rps
 			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
 	proc->gyro_z_rad_abs += proc->gyro_z_rps
 			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
 
-	proc->accel_roll = atan(proc->accel_x_g / proc->accel_z_g);
-	proc->accel_pitch = atan(proc->accel_y_g / proc->accel_z_g);
-	proc->accel_yaw = atan(proc->accel_x_g / proc->accel_y_g);
+	proc->accel_roll = atan2f(proc->accel_y_g, proc->accel_z_g);
+	proc->accel_pitch = atan2f(-1 * proc->accel_x_g,
+			sqrtf(proc->accel_y_g * proc->accel_y_g
+							+ proc->accel_z_g * proc->accel_z_g));
 
-
+	// Complementary filter
+	proc->combined_roll = 0.97 * proc->gyro_x_rad_abs + 0.03 * proc->accel_roll;
+	proc->combined_pitch = 0.97 * proc->gyro_y_rad_abs + 0.03 * proc->accel_pitch;
 
 }
 
@@ -720,7 +724,7 @@ int32_t SensorManager_Init(void) {
 	assert(MX_LSM6DSR_FIFO_Test_Init() == LSM6DSR_OK);
 	assert(MX_LPS22HH_Init() == LPS22HH_OK);
 
-    calibrate_gyro_bias();
+	calibrate_gyro_bias();
 
 	g_imu_task_loops = 0;
 	g_acc_ready_count = 0;

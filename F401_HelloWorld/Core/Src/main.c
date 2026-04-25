@@ -214,7 +214,6 @@ int main(void) {
 
 	/* Create the thread(s) */
 	/* creation of defaultTask */
-
 	/* USER CODE BEGIN RTOS_THREADS */
 	applicationInit();
 	/* add threads, ... */
@@ -260,7 +259,7 @@ void SystemClock_Config(void) {
 	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
 	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
 	RCC_OscInitStruct.PLL.PLLM = 16;
-	RCC_OscInitStruct.PLL.PLLN = 336;
+	RCC_OscInitStruct.PLL.PLLN = 320;
 	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
 	RCC_OscInitStruct.PLL.PLLQ = 7;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
@@ -414,8 +413,6 @@ static void MX_TIM4_Init(void) {
 	/* USER CODE END TIM4_Init 2 */
 	HAL_TIM_MspPostInit(&htim4);
 
-
-
 }
 
 /**
@@ -520,7 +517,7 @@ void StartDefaultTask(void *argument) {
 
 /**
  * @brief  Period elapsed callback in non blocking mode
- * @note   This function is called  when TIM2 interrupt took place, inside
+ * @note   This function is called  when TIM3 interrupt took place, inside
  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
  * a global variable "uwTick" used as application time base.
  * @param  htim : TIM handle
@@ -530,7 +527,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	/* USER CODE BEGIN Callback 0 */
 
 	/* USER CODE END Callback 0 */
-	if (htim->Instance == TIM2) {
+	if (htim->Instance == TIM3) {
 		HAL_IncTick();
 	}
 	/* USER CODE BEGIN Callback 1 */
