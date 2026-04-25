@@ -32,10 +32,6 @@
 #include <stdio.h>
 #include "app_bluenrg_ms.h"
 
-#define USER_LED_1_PORT (GPIOB)
-#define USER_LED_2_PORT (GPIOB)
-#define USER_LED_1_PIN  (GPIO_PIN_4)
-#define USER_LED_2_PIN  (GPIO_PIN_5)
 
 #define ALTITUDE_OFFSET_M (1)
 
@@ -296,12 +292,11 @@ void IMUAcquisitionTask(void *argument) {
 	(void) argument;
 
 	while (1) {
-		setUserLEDTwo(0);
+
 		int start = micros();
 		SensorManager_RunOnce();
 		int end = micros();
 		int diff = end - start;
-		setUserLEDTwo(1);
 		osDelay(IMU_SAMPLING_PERIOD_MS);
 	}
 }

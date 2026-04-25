@@ -163,7 +163,7 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 #if ENABLE_ALT_CONTROL
 	float latestAltitude = globalAltitudeOuput;
 #else
-	float latestAltitude = .7; // Math says ~70% is hovering
+	float latestAltitude = 0; // Math says ~70% is hovering
 #endif
 
 	//motor mixing algo (MMA)
