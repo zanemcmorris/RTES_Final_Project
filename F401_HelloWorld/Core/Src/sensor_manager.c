@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include "main.h"
 
 #include "vl53l0x_api.h"
 
@@ -62,6 +63,16 @@ static processed_tof_sample_t g_processed_tof = { 0 };
 static uint32_t micros(void) {
 	return (uint32_t) ((HAL_GetTick() * 1000U)
 			+ ((SysTick->LOAD - SysTick->VAL) * 1000U) / (SysTick->LOAD + 1U));
+}
+
+static inline void setUserLEDOne(uint8_t state) {
+	HAL_GPIO_WritePin(USER_LED_1_PORT, USER_LED_1_PIN,
+			state ? GPIO_PIN_RESET : GPIO_PIN_SET);
+}
+
+static inline void setUserLEDTwo(uint8_t state) {
+	HAL_GPIO_WritePin(USER_LED_2_PORT, USER_LED_2_PIN,
+			state ? GPIO_PIN_RESET : GPIO_PIN_SET);
 }
 
 static void spi2_deselect_all(void) {
@@ -127,6 +138,8 @@ static int32_t spi_bus_read_reg(spi_device_t *dev, uint8_t reg, uint8_t *pData,
 		spi_dev_deselect(dev);
 		return LSM6DSR_ERROR;
 	}
+
+
 
 	timeout_start = HAL_GetTick();
 
@@ -784,7 +797,13 @@ void SensorManager_RunOnce(void) {
 	uint8_t press_ready = 0;
 	uint8_t temp_ready = 0;
 
+	uint32_t startClock = 0, endClock = 0, diffClock = 0;
+
+	startClock = DWT->CYCCNT;
+
 	g_imu_task_loops++;
+
+	setUserLEDTwo(0);
 
 	LSM6DSR_ACC_Get_DRDY_Status(&MotionSensor, &acc_ready);
 	LSM6DSR_GYRO_Get_DRDY_Status(&MotionSensor, &gyro_ready);
@@ -808,6 +827,9 @@ void SensorManager_RunOnce(void) {
 		LSM6DSR_GYRO_GetAxes(&MotionSensor, &gyro);
 		g_gyro_read_count++;
 	}
+
+	setUserLEDTwo(1);
+
 
 	g_raw_imu.timestamp_us = micros();
 	g_raw_imu.accel_x_mg = accel.x;
@@ -852,6 +874,10 @@ void SensorManager_RunOnce(void) {
 	/* debug_output_send_current_mode(&accel, &gyro, &g_processed_imu, &g_processed_baro); */
 	/* baro_overrun_send_line(); */
 	/* imu_fifo_send_line(); */
+
+	endClock = DWT->CYCCNT;
+	diffClock = endClock - startClock;
+	diffClock *= 1.19e-5;
 
 	/* Keep these unused helper references in file so compiler does not warn if needed later */
 	(void) g_debug_output_mode;
