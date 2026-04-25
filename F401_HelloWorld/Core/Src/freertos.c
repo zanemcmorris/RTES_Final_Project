@@ -29,6 +29,8 @@
 #include <assert.h>
 #include "sensor_manager.h"
 #include "PID.h"
+#include <stdio.h>
+#include "app_bluenrg_ms.h"
 
 #define USER_LED_1_PORT (GPIOB)
 #define USER_LED_2_PORT (GPIOB)
