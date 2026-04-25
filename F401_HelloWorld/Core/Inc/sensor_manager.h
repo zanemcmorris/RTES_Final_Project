@@ -63,6 +63,10 @@ typedef struct
     float accel_y_g;
     float accel_z_g;
 
+    float accel_roll;
+    float accel_pitch;
+    float accel_yaw;
+
     float accel_x_mps2;
     float accel_y_mps2;
     float accel_z_mps2;

@@ -250,7 +250,23 @@ if (connected && notification_enabled)
         uint8_t buf[20];
         uint16_t ts = (uint16_t)(now & 0xFFFF);
 
-
+        /*
+         *
+         * Put your code into safe comment blocks!
+         * Data to send
+         * IMU
+         * 	processed accelerations, velocities, and positions (x,y,z)
+         * 	processed angular rates  & angular displacements (sent as rads, displayed as deg)
+         * 	altitude (meters)
+         * 	motor set points (m1,m2,m3,m4)
+         * 	error terms (RPY, altitude)
+         * 	CPU utilization (stretch)
+         * 	Add connection status to GUI
+         * 	measure Ci/IO latency
+         *
+         *
+         *
+         */
 
         if (pkt_toggle == 0)
         {
@@ -269,6 +285,7 @@ if (connected && notification_enabled)
         }
         else if (pkt_toggle == 1)
         {
+        	//
             /* Packet B: id(1) + ts(2) + gx(4) + gy(4) + gz(4) + gz_integrated(4) = 19 */
             buf[0] = 0x42;
             memcpy(buf + 1,  &ts,                2);

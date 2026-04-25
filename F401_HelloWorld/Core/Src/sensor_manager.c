@@ -308,36 +308,49 @@ static void preprocess_imu_sample(const raw_imu_sample_t *raw,
 		processed_imu_sample_t *proc) {
 	proc->timestamp_us = raw->timestamp_us;
 
+	// milli-g to g
 	proc->accel_x_g = raw->accel_x_mg / 1000.0f;
 	proc->accel_y_g = raw->accel_y_mg / 1000.0f;
 	proc->accel_z_g = raw->accel_z_mg / 1000.0f;
 
+	// g to meter per second^2
 	proc->accel_x_mps2 = proc->accel_x_g * GRAVITY_MPS2;
 	proc->accel_y_mps2 = proc->accel_y_g * GRAVITY_MPS2;
 	proc->accel_z_mps2 = proc->accel_z_g * GRAVITY_MPS2;
 
+	// Riemann sum acceleration (mps2 * t = mps)
 	proc->vel_x_mps = proc->accel_x_mps2 * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 	proc->vel_y_mps = proc->accel_y_mps2 * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 	proc->vel_z_mps = proc->accel_z_mps2 * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 
+	// Riemann sum velocity (mps * t = m)
 	proc->pos_x_m = proc->vel_x_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 	proc->pos_y_m = proc->vel_y_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 	proc->pos_z_m = proc->vel_z_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 
+	// milli-dps to dps
 	proc->gyro_x_dps = (raw->gyro_x_mdps - g_gyro_bias_x_mdps) / 1000.0f;
 	proc->gyro_y_dps = (raw->gyro_y_mdps - g_gyro_bias_y_mdps) / 1000.0f;
 	proc->gyro_z_dps = (raw->gyro_z_mdps - g_gyro_bias_z_mdps) / 1000.0f;
 
+	// dps to rps
 	proc->gyro_x_rps = proc->gyro_x_dps * DEG_TO_RAD;
 	proc->gyro_y_rps = proc->gyro_y_dps * DEG_TO_RAD;
 	proc->gyro_z_rps = proc->gyro_z_dps * DEG_TO_RAD;
 
+	// Riemann sum rps (rad per second * t = radian)
 	proc->gyro_x_rad_abs += proc->gyro_x_rps
 			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
 	proc->gyro_y_rad_abs += proc->gyro_y_rps
 			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
 	proc->gyro_z_rad_abs += proc->gyro_z_rps
 			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
+
+	proc->accel_roll = atan(proc->accel_x_g / proc->accel_z_g);
+	proc->accel_pitch = atan(proc->accel_y_g / proc->accel_z_g);
+	proc->accel_yaw = atan(proc->accel_x_g / proc->accel_y_g);
+
+
 
 }
 
@@ -602,7 +615,7 @@ static void vl53l0x_acquire_one_sample(void) {
 }
 
 static void calibrate_gyro_bias(void) {
-	const uint32_t num_samples = 100;
+	const uint32_t num_samples = 50;
 	uint32_t collected = 0;
 
 	int64_t sum_x = 0;
@@ -707,7 +720,7 @@ int32_t SensorManager_Init(void) {
 	assert(MX_LSM6DSR_FIFO_Test_Init() == LSM6DSR_OK);
 	assert(MX_LPS22HH_Init() == LPS22HH_OK);
 
-//    calibrate_gyro_bias();
+    calibrate_gyro_bias();
 
 	g_imu_task_loops = 0;
 	g_acc_ready_count = 0;

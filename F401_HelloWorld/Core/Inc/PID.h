@@ -91,6 +91,6 @@ typedef struct{
 
 void RPY_RunControlLoop(RPY_PID_State_t *state);
 void Altitude_RunControlLoop(Altitude_PID_State_t *state);
-void writeToMotors(int motorFR, int motorFL, int motorBR, int motorBL) ;
+void writeToMotors(float motorFR, float motorFL, float motorBR, float motorBL) ;
 
 #endif /* SRC_PID_H_ */

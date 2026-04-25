@@ -8,10 +8,10 @@
 #include "PID.h"
 
 // enjoy the terms!
-static PID_params_t rollPIDParams = { .4, 0, 0, 0 };
-static PID_params_t pitchPIDParams = { .4, 0, 0, 0 };
-static PID_params_t yawPIDParams = { .4, 0, 0, 0 };
-PID_params_t altitudePIDParams = { .4, 0, 0, 0 };
+static PID_params_t rollPIDParams = { .35, .08, .01, 0 };
+static PID_params_t pitchPIDParams = { .35, .08, .01, 0 };
+static PID_params_t yawPIDParams = { .6, .08, .01, 0 };
+PID_params_t altitudePIDParams = { .1, 0, 0, 0 };
 
 static float globalAltitudeOuput; //needed? static
 // Filter coefficient for the D-term (0.0 to 1.0)
@@ -20,12 +20,12 @@ const float d_filter_alpha = 0.2f;
 
 extern TIM_HandleTypeDef htim4;
 extern osMutexId_t IMUDataMutexID;
-extern processed_imu_sample_t  g_processed_imu;
+extern processed_imu_sample_t g_processed_imu;
 extern osMutexId_t altitudeDataMutexID;
 extern processed_baro_sample_t g_processed_baro;
 extern osMutexId_t outputThrustDataMutexID;
 
-void writeToMotors(int motorFR, int motorFL, int motorBR, int motorBL) {
+void writeToMotors(float motorFR, float motorFL, float motorBR, float motorBL) {
 	if (motorFR > 100)
 		motorFR = 100;
 	if (motorFL > 100)
@@ -44,14 +44,11 @@ void writeToMotors(int motorFR, int motorFL, int motorBR, int motorBL) {
 	if (motorBL < 0)
 		motorBL = 0;
 
-
-
 	//motor vals are between 0-2099, y = 2099/100 * x
 	uint32_t frSetting = 2099 * motorFR;
 	uint32_t flSetting = 2099 * motorFL;
 	uint32_t brSetting = 2099 * motorBR;
 	uint32_t blSetting = 2099 * motorBL;
-
 
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, blSetting);
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, frSetting);
@@ -59,9 +56,12 @@ void writeToMotors(int motorFR, int motorFL, int motorBR, int motorBL) {
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, flSetting);
 }
 
+#define ENABLE_ROLL_CONTROL (1)
+#define ENABLE_PITCH_CONTROL (1)
+#define ENABLE_YAW_CONTROL (0)
+#define ENABLE_ALT_CONTROL (0)
 
-
-void RPY_RunControlLoop(RPY_PID_State_t *state){
+void RPY_RunControlLoop(RPY_PID_State_t *state) {
 	osMutexAcquire(IMUDataMutexID, MUTEX_TIMEOUT); //lock mutex around IMU values, copy, then unlock
 	processed_imu_sample_t currentProcessedIMU = g_processed_imu;
 	osMutexRelease(IMUDataMutexID); //unlock
@@ -79,7 +79,6 @@ void RPY_RunControlLoop(RPY_PID_State_t *state){
 
 	if (dt <= 0.0f || dt > 0.05f)
 		dt = 0.002f;
-
 
 	state->currentState.roll = currentProcessedIMU.gyro_x_rad_abs;
 	state->currentState.pitch = currentProcessedIMU.gyro_y_rad_abs;
@@ -126,15 +125,29 @@ void RPY_RunControlLoop(RPY_PID_State_t *state){
 	state->yawLastError = yawError;
 
 	//calculate outputs
+#if ENABLE_ROLL_CONTROL
 	float rollOutput = (rollPIDParams.kp * rollError)
 			+ (rollPIDParams.ki * state->rollIntegral)
 			+ (rollPIDParams.kd * rollDerivative);
+#else
+	float rollOutput = 0;
+#endif
+
+#if ENABLE_PITCH_CONTROL
 	float pitchOutput = (pitchPIDParams.kp * pitchError)
 			+ (pitchPIDParams.ki * state->pitchIntegral)
 			+ (pitchPIDParams.kd * pitchDerivative);
+#else
+	float pitchOutput = 0;
+#endif
+
+#if ENABLE_YAW_CONTROL
 	float yawOutput = (yawPIDParams.kp * yawError)
 			+ (yawPIDParams.ki * state->yawIntegral)
 			+ (yawPIDParams.kd * yawDerivative);
+#else
+	float yawOutput = 0;
+#endif
 
 	//need to clamp output?
 	if (rollOutput > MAX_OUTPUT)
@@ -144,9 +157,14 @@ void RPY_RunControlLoop(RPY_PID_State_t *state){
 	if (yawOutput > MAX_OUTPUT)
 		yawOutput = MAX_OUTPUT;
 
+#if ENABLE_ALT_CONTROL
 	float latestAltitude = globalAltitudeOuput;
+#else
+	float latestAltitude = .7; // Math says ~70% is hovering
+#endif
 
 	//motor mixing algo (MMA)
+	// TODO: Add these to BLE telemetry - motor values are in [0,1]
 	float motorFR = latestAltitude + yawOutput + pitchOutput + rollOutput;
 	float motorFL = latestAltitude - yawOutput + pitchOutput - rollOutput;
 	float motorBR = latestAltitude - yawOutput - pitchOutput + rollOutput;
@@ -167,8 +185,7 @@ void RPY_RunControlLoop(RPY_PID_State_t *state){
 	writeToMotors(motorFR, motorFL, motorBR, motorBL);
 }
 
-
-void Altitude_RunControlLoop(Altitude_PID_State_t *state){
+void Altitude_RunControlLoop(Altitude_PID_State_t *state) {
 	//get current altitude
 	osMutexAcquire(altitudeDataMutexID, MUTEX_TIMEOUT);
 	processed_baro_sample_t currentBarometerReading = g_processed_baro;
@@ -185,11 +202,13 @@ void Altitude_RunControlLoop(Altitude_PID_State_t *state){
 		state->lastBaroTimestampUs = currentBarometerReading.timestamp_us;
 		state->isFirstRun = false;
 	} else {
-		dt = (float) (currentBarometerReading.timestamp_us - state->lastBaroTimestampUs) / 1000000.0f;
+		dt = (float) (currentBarometerReading.timestamp_us
+				- state->lastBaroTimestampUs) / 1000000.0f;
 		state->lastBaroTimestampUs = currentBarometerReading.timestamp_us;
 	}
 
-	if (dt <= 0.0f || dt > 0.1f) dt = 0.01f;
+	if (dt <= 0.0f || dt > 0.1f)
+		dt = 0.01f;
 
 	float altitudeError = altitudePIDParams.setpoint - state->currentAltitude;
 
@@ -204,23 +223,16 @@ void Altitude_RunControlLoop(Altitude_PID_State_t *state){
 			+ ((1.0f - d_filter_alpha) * state->altDerivativeFiltered);
 	state->altitudeLastError = altitudeError;
 
-
 	float altitudeOutput = (altitudePIDParams.kp * altitudeError)
 			+ (altitudePIDParams.ki * state->altitudeIntegral)
 			+ (altitudePIDParams.kd * state->altDerivativeFiltered);
 
 	//clamp output?
-	if (altitudeOutput > MAX_OUTPUT) altitudeOutput = MAX_OUTPUT;
+	if (altitudeOutput > MAX_OUTPUT)
+		altitudeOutput = MAX_OUTPUT;
 
 	osMutexAcquire(outputThrustDataMutexID, PID_SEMAPHORE_TIMEOUT); //mutex unlock
 	globalAltitudeOuput = altitudeOutput;
 	osMutexRelease(outputThrustDataMutexID); //mutex unlock
 }
-
-
-
-
-
-
-
 
