@@ -257,16 +257,77 @@ void enableNotification(void)
  * @param  att_data : pointer to the modified attribute data
  * @retval None
  */
+// void Attribute_Modified_CB(uint16_t handle, uint8_t data_length, uint8_t *att_data)
+// {
+//   if(handle == RXCharHandle + 1){
+     
+//       FCU_CMD_Dispatch(att_data, data_length); 
+//     //HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+
+//    // printf("Package ACK\n");
+//    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+//    //  receiveData(att_data, data_length);
+//    } else if (handle == TXCharHandle + 2) {
+//      if(att_data[0] == 0x01)
+//        notification_enabled = TRUE;
+//   }
+// }
+
+/*
+We need to command drone to do stuff
+*/
 void Attribute_Modified_CB(uint16_t handle, uint8_t data_length, uint8_t *att_data)
 {
-  if(handle == RXCharHandle + 1){
-    receiveData(att_data, data_length);
-  } else if (handle == TXCharHandle + 2) {
-    if(att_data[0] == 0x01)
-      notification_enabled = TRUE;
-  }
-}
+    if (handle == RXCharHandle + 1)
+    {
+        printf("CMD rx len=%u:", data_length);
+        for (uint8_t i = 0; i < data_length; i++){
+            printf(" %02X", att_data[i]);
+        }
 
+        printf("\r\n");
+ 
+        // 5 byte packet: cmd_id (1 byte) + param float(4 bytes) 
+        if (data_length >= 5)
+        {
+            // Passing Command ID instead of 
+            uint8_t cmd_id = att_data[0];
+          
+            //For Left and Right commands 
+            float param;
+            memcpy(&param, &att_data[1], sizeof(float)); 
+ 
+            switch (cmd_id)
+            {
+                case 0x01: printf("CMD: START\r\n");                       break;
+                case 0x02: printf("CMD: STOP\r\n");                        break;
+                case 0x03: printf("CMD: HOVER\r\n");                       break;
+                case 0x04: printf("CMD: LAND\r\n");                        break;
+                case 0x05: printf("CMD: MOVE_LEFT %.2f m/s\r\n", param);   break;
+                case 0x06: printf("CMD: MOVE_RIGHT %.2f m/s\r\n", param);  break;
+                default:   printf("CMD: unknown 0x%02X param=%.3f\r\n",
+                                  cmd_id, param);                           break;
+            }
+        }
+        else
+        {
+            printf("CMD: packet too short (%u bytes)\r\n", data_length);
+        }
+    }
+    else if (handle == TXCharHandle + 2)
+    {
+        if (att_data[0] == 0x01)
+        {
+            notification_enabled = TRUE;
+            printf("notifications enabled\r\n");   /* ADD THIS LINE */
+        }
+        else
+        {
+            notification_enabled = FALSE;
+            printf("notifications disabled\r\n");
+        }
+    }
+}
 /**
  * @brief  This function is called when there is a LE Connection Complete event.
  * @param  addr : Address of peer device
