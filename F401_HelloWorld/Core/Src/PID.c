@@ -7,6 +7,9 @@
 
 #include "PID.h"
 
+//BLE 
+volatile motor_outputs_t g_motor_outputs = {0};
+
 // enjoy the terms!
 static PID_params_t rollPIDParams = { .35, .08, .01, 0 };
 static PID_params_t pitchPIDParams = { .35, .08, .01, 0 };
@@ -183,6 +186,14 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 	// Post to global motor data
 
 	writeToMotors(motorFR, motorFL, motorBR, motorBL);
+
+	//BLE
+	osMutexAcquire(outputThrustDataMutexID, MUTEX_TIMEOUT);
+	g_motor_outputs.fr = motorFR;
+	g_motor_outputs.fl = motorFL;
+	g_motor_outputs.br = motorBR;
+	g_motor_outputs.bl = motorBL;
+	osMutexRelease(outputThrustDataMutexID);
 }
 
 void Altitude_RunControlLoop(Altitude_PID_State_t *state) {

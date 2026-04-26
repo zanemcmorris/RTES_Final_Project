@@ -185,7 +185,8 @@ int main(void) {
 	MX_USART1_UART_Init();
 	MX_I2C2_Init();
 	MX_TIM4_Init();
-	MX_BlueNRG_MS_Init();
+	//Init Happening 2 times
+	//MX_BlueNRG_MS_Init();
 	/* USER CODE BEGIN 2 */
 	MX_PA8_CS_Init();
 	MX_PC13_CS_Init();
