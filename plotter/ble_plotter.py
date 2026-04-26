@@ -15,7 +15,9 @@ ADDRESS     = "02:80:E1:00:00:AA"
 NOTIFY_UUID = "d973f2e1-b19e-11e2-9e96-0800200c9a66"
 
 FMT_A = '<BHffff'   # accel + pressure
-FMT_B = '<BHffff'   # gyro
+FMT_B = '<BHffff'   # gyro + integrated yaw
+FMT_C = '<BHffff'   # vel x/y/z + pos_z       
+FMT_D = '<BHffff'   # motor FR/FL/BR/BL
 
 
 # ================= CONVERSIONS =================
@@ -30,67 +32,94 @@ def pressure_hpa_to_altitude_feet(pressure_hpa, sea_level_hpa=1013.25):
 class IMUBLEReader:
     def __init__(self, maxlen=5000, sea_level_hpa=1013.25):
         self.lock = threading.Lock()
+        self.sea_level_hpa = sea_level_hpa
+        self.start_time = time.monotonic()
+        self.imu_samples  = 0
+        self.baro_samples = 0
 
-        # accel
+        # accel (Packet A)
         self.t = collections.deque(maxlen=maxlen)
         self.ax = collections.deque(maxlen=maxlen)
         self.ay = collections.deque(maxlen=maxlen)
         self.az = collections.deque(maxlen=maxlen)
 
-        # gyro (FIXED: separate timestamps)
+        # gyro (Packet B)
         self.t_gyro = collections.deque(maxlen=maxlen)
         self.gx = collections.deque(maxlen=maxlen)
         self.gy = collections.deque(maxlen=maxlen)
         self.gz = collections.deque(maxlen=maxlen)
+        self.deg          = collections.deque(maxlen=maxlen)  
+        self.yaw          = 0.0                              
+        self.roll         = 0.0                               
+        self.pitch        = 0.0                               
 
-        # baro
-        self.t_baro = collections.deque(maxlen=maxlen)
+        # baro (packet A)
+        self.t_baro       = collections.deque(maxlen=maxlen)
         self.pressure_hpa = collections.deque(maxlen=maxlen)
         self.temperature_c = collections.deque(maxlen=maxlen)
         self.altitude_ft = collections.deque(maxlen=maxlen)
 
-        self.start_time = time.monotonic()
+        # velocity / position (packet C)
+        self.vx           = collections.deque(maxlen=maxlen)  # ← was missing
+        self.vy           = collections.deque(maxlen=maxlen)  # ← was missing
+        self.vz           = collections.deque(maxlen=maxlen)  # ← was missing
+        self.pz           = collections.deque(maxlen=maxlen)  # ← was missing
 
-        self.imu_samples = 0
-        self.baro_samples = 0
-        self.sea_level_hpa = sea_level_hpa
+        # motors (packet D)
+        self.motors       = [0.0, 0.0, 0.0, 0.0]             # ← was missing
 
+    # ← handle_packet and snapshot were at module level (wrong indentation)
     def handle_packet(self, data: bytearray):
         if len(data) < 1:
             return
-
-        pkt_type = data[0]
+        pkt = data[0]
         now = time.monotonic() - self.start_time
 
-        # ===== PACKET A (ACCEL + BARO) =====
-        if pkt_type == 0x41 and len(data) >= 19:
+        if pkt == 0x41 and len(data) >= 19:
             _, ts, ax, ay, az, pressure = struct.unpack(FMT_A, data[:19])
-
             with self.lock:
                 self.t.append(now)
                 self.ax.append(ax)
                 self.ay.append(ay)
                 self.az.append(az)
-
-                altitude = pressure_hpa_to_altitude_feet(pressure, self.sea_level_hpa)
-
                 self.t_baro.append(now)
-                self.pressure_hpa.append(pressure)
-                self.temperature_c.append(0.0)
-                self.altitude_ft.append(altitude)
+                self.pressure_hpa.append(pressure)            # ← was self.pres
+                self.altitude_ft.append(                      # ← was self.alt_ft
+                    pressure_hpa_to_altitude_feet(pressure)   # ← was pressure_to_alt_ft
+                )
+                self.imu_samples  += 1
+                self.baro_samples += 1
 
-                self.imu_samples += 1
-                self.baro_samples += 1   # FIXED
-
-        # ===== PACKET B (GYRO) =====
-        elif pkt_type == 0x42 and len(data) >= 19:
-            _, ts, gx, gy, gz, _ = struct.unpack(FMT_B, data[:19])
-
+        elif pkt == 0x42 and len(data) >= 19:
+            _, ts, gx, gy, gz, yaw_rad = struct.unpack(FMT_B, data[:19])
             with self.lock:
                 self.t_gyro.append(now)
                 self.gx.append(gx)
                 self.gy.append(gy)
                 self.gz.append(gz)
+                self.yaw = math.degrees(yaw_rad)
+                self.deg.append(self.yaw)
+                if self.ay and self.az:
+                    self.roll  = math.degrees(math.atan2(self.ay[-1], self.az[-1]))
+                if self.ax and self.ay and self.az:
+                    self.pitch = math.degrees(math.atan2(
+                        -self.ax[-1],
+                        math.hypot(self.ay[-1], self.az[-1])
+                    ))
+
+        elif pkt == 0x43 and len(data) >= 19:
+            _, ts, vx, vy, vz, pos_z = struct.unpack(FMT_C, data[:19])  # ← FMT_C now defined
+            with self.lock:
+                self.t.append(now)
+                self.vx.append(vx)
+                self.vy.append(vy)
+                self.vz.append(vz)
+                self.pz.append(pos_z)
+
+        elif pkt == 0x44 and len(data) >= 19:
+            _, ts, fr, fl, br, bl = struct.unpack(FMT_D, data[:19])
+            with self.lock:
+                self.motors = [fl, fr, bl, br]
 
     def snapshot(self):
         with self.lock:
@@ -100,17 +129,27 @@ class IMUBLEReader:
                 "ay": list(self.ay),
                 "az": list(self.az),
 
-                "t_gyro": list(self.t_gyro),
-                "gx": list(self.gx),
-                "gy": list(self.gy),
-                "gz": list(self.gz),
+                "t_gyro":       list(self.t_gyro),
+                "gx":           list(self.gx),
+                "gy":           list(self.gy),
+                "gz":           list(self.gz),
+                "deg":          list(self.deg),               # ← was missing
+                "yaw":          self.yaw,                     # ← was missing
+                "roll":         self.roll,                    # ← was missing
+                "pitch":        self.pitch,                   # ← was missing
 
                 "t_baro": list(self.t_baro),
                 "pressure_hpa": list(self.pressure_hpa),
                 "temperature_c": list(self.temperature_c),
                 "altitude_ft": list(self.altitude_ft),
 
-                "imu_samples": self.imu_samples,
+                "vx":           list(self.vx),                # ← was missing
+                "vy":           list(self.vy),                # ← was missing
+                "vz":           list(self.vz),                # ← was missing
+                "alt_m":        list(self.pz),                # ← was missing
+
+                "motors":       list(self.motors),            # ← was missing
+                "imu_samples":  self.imu_samples,
                 "baro_samples": self.baro_samples,
             }
 
@@ -175,8 +214,7 @@ def build_plot(window_seconds=10.0):
     gyro_y_line, = ax_gyro.plot([], [], label="gy")
     gyro_z_line, = ax_gyro.plot([], [], label="gz")
 
-    # baro
-    alt_line, = ax_alt.plot([], [], label="altitude")
+    alt_line,     = ax_alt.plot([], [], label="altitude (ft)")
     pressure_text = ax_alt.text(0.01, 0.95, "", transform=ax_alt.transAxes)
 
     for ax in (ax_acc, ax_gyro, ax_alt):
@@ -201,14 +239,9 @@ def build_plot(window_seconds=10.0):
             acc_x_line.set_data(ts, data["ax"][i0:])
             acc_y_line.set_data(ts, data["ay"][i0:])
             acc_z_line.set_data(ts, data["az"][i0:])
+            set_y_limits(ax_acc, [data["ax"][i0:], data["ay"][i0:], data["az"][i0:]])
 
-            set_y_limits(ax_acc, [
-                data["ax"][i0:],
-                data["ay"][i0:],
-                data["az"][i0:]
-            ])
-
-        # ================= GYRO (FIXED) =================
+        # gyro
         tg = data["t_gyro"]
         if tg:
             t_end = tg[-1]
@@ -217,18 +250,12 @@ def build_plot(window_seconds=10.0):
             ts = tg[i0:]
 
             ax_gyro.set_xlim(t_start, t_end)
+            gyro_x_line.set_data(ts, data["gx"][i0:])
+            gyro_y_line.set_data(ts, data["gy"][i0:])
+            gyro_z_line.set_data(ts, data["gz"][i0:])
+            set_y_limits(ax_gyro, [data["gx"][i0:], data["gy"][i0:], data["gz"][i0:]])
 
-            gx = data["gx"][i0:]
-            gy = data["gy"][i0:]
-            gz = data["gz"][i0:]
-
-            gyro_x_line.set_data(ts, gx)
-            gyro_y_line.set_data(ts, gy)
-            gyro_z_line.set_data(ts, gz)
-
-            set_y_limits(ax_gyro, [gx, gy, gz])
-
-        # ================= BARO =================
+        # baro
         tb = data["t_baro"]
         if tb:
             t_end = tb[-1]
@@ -247,8 +274,12 @@ def build_plot(window_seconds=10.0):
             if pres:
                 pressure_text.set_text(f"P: {pres[-1]:.2f} hPa")
 
+        # status bar — alt_m key, isolated before f-string
+        alt_str = f"{data['alt_m'][-1]:.2f} m" if data["alt_m"] else "--"
         status_text.set_text(
-            f"IMU: {data['imu_samples']}  BARO: {data['baro_samples']}"
+            f"IMU: {data['imu_samples']}  BARO: {data['baro_samples']}  "
+            f"Roll: {data['roll']:+.1f}°  Pitch: {data['pitch']:+.1f}°  "
+            f"Yaw: {data['yaw']:+.1f}°  Alt: {alt_str}"
         )
 
         return (

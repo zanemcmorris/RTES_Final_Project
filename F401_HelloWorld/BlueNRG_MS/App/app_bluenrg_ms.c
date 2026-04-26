@@ -29,6 +29,9 @@
 #include "bluenrg_hal_aci.h"
 
 #include <string.h>
+#include "PID.h"
+
+extern volatile motor_outputs_t g_motor_outputs;
 
 typedef struct {
     float ax_g, ay_g, az_g;
@@ -230,94 +233,89 @@ void MX_BlueNRG_MS_Init(void)
 void MX_BlueNRG_MS_Process(void)
 {
   /* USER CODE BEGIN BlueNRG_MS_Process_PreTreatment */
-
-  /* USER CODE END BlueNRG_MS_Process_PreTreatment */
-
   User_Process();
   hci_user_evt_proc();
+  /* USER CODE END BlueNRG_MS_Process_PreTreatment */
+
+
 
 
   /* USER CODE BEGIN BlueNRG_MS_Process_PostTreatment */
   static uint32_t last_telem_tick = 0;
-static uint8_t  pkt_toggle = 0;
-
-if (connected && notification_enabled)
-{
-    uint32_t now = HAL_GetTick();
-    if ((now - last_telem_tick) >= 50)   /* 20Hz alternating = 10Hz per packet type */
-    {
-        last_telem_tick = now;
-        uint8_t buf[20];
-        uint16_t ts = (uint16_t)(now & 0xFFFF);
-
-        /*
-         *
-         * Put your code into safe comment blocks!
-         * Data to send
-         * IMU
-         * 	processed accelerations, velocities, and positions (x,y,z)
-         * 	processed angular rates  & angular displacements (sent as rads, displayed as deg)
-         * 	altitude (meters)
-         * 	motor set points (m1,m2,m3,m4)
-         * 	error terms (RPY, altitude)
-         * 	CPU utilization (stretch)
-         * 	Add connection status to GUI
-         * 	measure Ci/IO latency
-         *
-         *
-         *
-         */
-
-        if (pkt_toggle == 0)
+  static uint8_t  pkt_toggle      = 0;
+ 
+  if (connected && notification_enabled)
+  {
+        uint32_t now_ms = HAL_GetTick();
+ 
+        if ((now_ms - last_telem_tick) >= 25U)   // every 25msec send one packet (20 bytes) --> So in 100msec send 80 bytes
         {
-
-            // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-            /* Packet A: id(1) + ts(2) + ax(4) + ay(4) + az(4) + pressure(4) = 19 */
-            buf[0] = 0x41;
-            memcpy(buf + 1,  &ts,                    2);
-            memcpy(buf + 3,  &g_processed_imu.accel_x_g,         4);
-            memcpy(buf + 7,  &g_processed_imu.accel_y_g,         4);
-            memcpy(buf + 11, &g_processed_imu.accel_z_g,         4);
-            memcpy(buf + 15, &g_processed_baro.pressure_hpa, 4);
-           // printf("Sent the package 1\n");
-          //  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-            sendData(buf, 19);
+            last_telem_tick = now_ms;
+ 
+            uint8_t  buf[19];
+            uint16_t ts = (uint16_t)(now_ms & 0xFFFFU);
+ 
+            switch (pkt_toggle)
+            {
+                // Packet A : accel (g) + barometric pressure (hPa)
+                case 0:
+                {
+                    buf[0] = 0x41U;
+                    memcpy(buf +  1, &ts,                              sizeof(uint16_t));
+                    memcpy(buf +  3, &g_processed_imu.accel_x_g,      sizeof(float));
+                    memcpy(buf +  7, &g_processed_imu.accel_y_g,      sizeof(float));
+                    memcpy(buf + 11, &g_processed_imu.accel_z_g,      sizeof(float));
+                    memcpy(buf + 15, &g_processed_baro.pressure_hpa,  sizeof(float));
+                    sendData(buf, 19U);
+                    break;
+                }
+ 
+                //Packet B : gyro (dps) + integrated yaw (rad)
+                case 1:
+                {
+                    buf[0] = 0x42U;
+                    memcpy(buf +  1, &ts,                                sizeof(uint16_t));
+                    memcpy(buf +  3, &g_processed_imu.gyro_x_dps,       sizeof(float));
+                    memcpy(buf +  7, &g_processed_imu.gyro_y_dps,       sizeof(float));
+                    memcpy(buf + 11, &g_processed_imu.gyro_z_dps,       sizeof(float));
+                    memcpy(buf + 15, &g_processed_imu.gyro_z_rad_abs,   sizeof(float));
+                    sendData(buf, 19U);
+                    break;
+                }
+ 
+                //Packet C : FC velocity (m/s) + vertical position (m)
+                case 2:
+                {
+                    buf[0] = 0x43U;
+                    memcpy(buf +  1, &ts,                              sizeof(uint16_t));
+                    memcpy(buf +  3, &g_processed_imu.vel_x_mps,      sizeof(float));
+                    memcpy(buf +  7, &g_processed_imu.vel_y_mps,      sizeof(float));
+                    memcpy(buf + 11, &g_processed_imu.vel_z_mps,      sizeof(float));
+                    memcpy(buf + 15, &g_processed_imu.pos_z_m,        sizeof(float));
+                    sendData(buf, 19U);
+                    break;
+                }
+ 
+                //Packet D : motor setpoints (0.0 – 1.0)
+                case 3:
+                {
+                    buf[0] = 0x44U;
+                    memcpy(buf +  1, &ts,                   sizeof(uint16_t));
+                    memcpy(buf +  3, &g_motor_outputs.fr,   sizeof(float));
+                    memcpy(buf +  7, &g_motor_outputs.fl,   sizeof(float));
+                    memcpy(buf + 11, &g_motor_outputs.br,   sizeof(float));
+                    memcpy(buf + 15, &g_motor_outputs.bl,   sizeof(float));
+                    sendData(buf, 19U);
+                    break;
+                }
+ 
+                default:
+                    break;
+            }
+ 
+            pkt_toggle = (pkt_toggle + 1U) % 4U;
         }
-        else if (pkt_toggle == 1)
-        {
-        	//
-            /* Packet B: id(1) + ts(2) + gx(4) + gy(4) + gz(4) + gz_integrated(4) = 19 */
-            buf[0] = 0x42;
-            memcpy(buf + 1,  &ts,                2);
-            memcpy(buf + 3,  &g_processed_imu.gyro_x_dps, 4);
-            memcpy(buf + 7,  &g_processed_imu.gyro_y_dps, 4);
-            memcpy(buf + 11, &g_processed_imu.gyro_z_dps, 4);
-            memcpy(buf + 15, &g_processed_imu.gyro_z_rad_abs, 4);  // integrated yaw, useful for the deg plot
-            // printf("Sent the package 2\n");
-            // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-            sendData(buf, 19);
-        }else{
-            buf[0] = 0x43;
-            memcpy(buf + 1,  &ts,               2);
-            memcpy(buf + 3,  &g_processed_imu.vel_x_mps,  4);
-            memcpy(buf + 7,  &g_processed_imu.vel_y_mps,  4);
-            memcpy(buf + 11, &g_processed_imu.vel_z_mps,  4);
-            memcpy(buf + 15, &g_processed_imu.pos_z_m, 4);
-            // printf("Sent the package 3\n");
-            // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-            sendData(buf, 19);
-        }
-        if(pkt_toggle == 0)
-        {
-            pkt_toggle = 1;
-        }else if(pkt_toggle == 1){
-            pkt_toggle = 2;
-        }else{
-            pkt_toggle = 0;
-        }
-
     }
-}
 
   /* USER CODE END BlueNRG_MS_Process_PostTreatment */
 }

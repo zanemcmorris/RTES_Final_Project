@@ -42,6 +42,12 @@
 #define ALT_MAX_I 10.0f
 
 
+//BLE - motor
+typedef struct {
+    float fr, fl, br, bl; 
+} motor_outputs_t;
+extern volatile motor_outputs_t g_motor_outputs;
+
 typedef struct {
 	float kp;
 	float ki;
