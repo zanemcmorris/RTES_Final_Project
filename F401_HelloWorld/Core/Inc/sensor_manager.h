@@ -11,7 +11,7 @@ extern "C" {
 #include "lps22hh.h"
 #include <stdint.h>
 
-#define IMU_SAMPLING_FREQ (104)
+#define IMU_SAMPLING_FREQ (417)
 #define IMU_SAMPLING_PERIOD_MS (1000.0 / IMU_SAMPLING_FREQ)
 
 #define IMU_CS_PORT  GPIOA

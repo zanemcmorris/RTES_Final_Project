@@ -246,13 +246,13 @@ int32_t MX_LSM6DSR_Init(void) {
 		return LSM6DSR_ERROR;
 
 	if (LSM6DSR_ACC_SetOutputDataRate(&MotionSensor,
-			LSM6DSR_XL_ODR_104Hz) != LSM6DSR_OK)
+			IMU_SAMPLING_FREQ) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 	if (LSM6DSR_ACC_SetFullScale(&MotionSensor, fullScale) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
 	if (LSM6DSR_GYRO_SetOutputDataRate(&MotionSensor,
-			LSM6DSR_XL_ODR_104Hz) != LSM6DSR_OK)
+			IMU_SAMPLING_FREQ) != LSM6DSR_OK)
 		return LSM6DSR_ERROR; // TODO: Make sure these enum defns match the #defined period and freq
 	if (LSM6DSR_GYRO_SetFullScale(&MotionSensor, LSM6DSR_250dps) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
