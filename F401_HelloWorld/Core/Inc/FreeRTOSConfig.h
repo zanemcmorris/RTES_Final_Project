@@ -54,6 +54,16 @@
 #endif
 #ifndef CMSIS_device_header
 #define CMSIS_device_header "stm32f4xx.h"
+#define configGENERATE_RUN_TIME_STATS         1
+#define configUSE_STATS_FORMATTING_FUNCTIONS  1
+
+#define INCLUDE_uxTaskGetStackHighWaterMark2  1
+
+extern void ConfigureRuntimeStatsTimer(void);
+extern uint32_t GetRuntimeStatsCounter(void);
+
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()    ConfigureRuntimeStatsTimer()
+#define portGET_RUN_TIME_COUNTER_VALUE()            GetRuntimeStatsCounter()
 #endif /* CMSIS_device_header */
 
 #define configENABLE_FPU                         1
@@ -62,7 +72,7 @@
 #define configUSE_PREEMPTION                     1
 #define configSUPPORT_STATIC_ALLOCATION          1
 #define configSUPPORT_DYNAMIC_ALLOCATION         1
-#define configUSE_IDLE_HOOK                      0
+#define configUSE_IDLE_HOOK                      1
 #define configUSE_TICK_HOOK                      0
 #define configCPU_CLOCK_HZ                       ( SystemCoreClock )
 #define configTICK_RATE_HZ                       ((TickType_t)1000)
