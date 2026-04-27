@@ -160,6 +160,18 @@ static void dwt_init(void) {
 	DWT->CYCCNT = 0;                                 // reset counter
 	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;             // enable counter
 }
+
+void ConfigureRuntimeStatsTimer(void)
+{
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+uint32_t GetRuntimeStatsCounter(void)
+{
+    return DWT->CYCCNT;
+}
 /* USER CODE END 0 */
 
 /**
@@ -195,8 +207,7 @@ int main(void) {
 	MX_USART1_UART_Init();
 	MX_I2C2_Init();
 	MX_TIM4_Init();
-	//Init Happening 2 times
-	//MX_BlueNRG_MS_Init();
+	MX_BlueNRG_MS_Init();
 	/* USER CODE BEGIN 2 */
 	MX_PA8_CS_Init();
 	MX_PC13_CS_Init();

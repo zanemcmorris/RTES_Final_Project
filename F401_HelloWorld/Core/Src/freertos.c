@@ -63,7 +63,7 @@ osThreadAttr_t altitudeTaskAttr = { .name = "altitudePIDTask", .priority =
 osThreadId_t altitudeTaskID;
 
 osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority =
-		osPriorityLow, .stack_size = 1024 };
+		osPriorityLow, .stack_size = 1500 };
 osThreadId_t uartCommTaskID;
 
 osThreadAttr_t bleCommTaskAttr = { .name = "bleComm", .priority = osPriorityLow,
@@ -140,7 +140,23 @@ void bluetoothControlTask(void *argument);
 /* USER CODE END FunctionPrototypes */
 
 /* Hook prototypes */
+void vApplicationIdleHook(void);
 void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
+
+/* USER CODE BEGIN 2 */
+void vApplicationIdleHook( void )
+{
+   /* vApplicationIdleHook() will only be called if configUSE_IDLE_HOOK is set
+   to 1 in FreeRTOSConfig.h. It will be called on each iteration of the idle
+   task. It is essential that code added to this hook function never attempts
+   to block in any way (for example, call xQueueReceive() with a block time
+   specified, or call vTaskDelay()). If the application makes use of the
+   vTaskDelete() API function (as this demo application does) then it is also
+   important that vApplicationIdleHook() is permitted to return to its calling
+   function, because it is the responsibility of the idle task to clean up
+   memory allocated by the kernel to any task that has since been deleted. */
+}
+/* USER CODE END 2 */
 
 /* USER CODE BEGIN 4 */
 static inline void setUserLEDOne(uint8_t state) {
@@ -159,6 +175,24 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 	__disable_irq();
 	while (1) {
 	}
+}
+
+void PrintFreeRTOSStats(void)
+{
+    char buf[512];
+
+    memset(buf, 0, sizeof(buf));
+
+    snprintf(buf, sizeof(buf),
+             "\r\nTask          Abs Time      %% Time\r\n"
+             "--------------------------------------\r\n");
+
+    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
+
+    memset(buf, 0, sizeof(buf));
+    vTaskGetRunTimeStats(buf);
+
+    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
 }
 /* USER CODE END 4 */
 
@@ -291,7 +325,8 @@ void uartCommTask(void *argument) {
 	osDelay(200);
 
 	while (1) {
-		osDelay(200);
+		osDelay(2000);
+		PrintFreeRTOSStats();
 	}
 }
 
