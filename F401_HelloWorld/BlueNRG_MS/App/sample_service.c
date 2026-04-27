@@ -142,7 +142,7 @@ void Make_Connection(void) {
 		printf("Client Create Connection\n");
 		tBDAddr bdaddr = { 0xaa, 0x00, 0x00, 0xE1, 0x80, 0x02 };
 
-		BSP_LED_On(LED2); //To indicate the start of the connection and discovery phase
+	//	BSP_LED_On(LED2); //To indicate the start of the connection and discovery phase
 
 		/*
 		 Scan_Interval, Scan_Window, Peer_Address_Type, Peer_Address, Own_Address_Type, Conn_Interval_Min,
@@ -220,7 +220,7 @@ void startReadRXCharHandle(void) {
  * @retval None
  */
 void receiveData(uint8_t *data_buffer, uint8_t Nb_bytes) {
-	BSP_LED_Toggle(LED2);
+	//BSP_LED_Toggle(LED2);
 
 	for (int i = 0; i < Nb_bytes; i++) {
 		printf("%c", data_buffer[i]);

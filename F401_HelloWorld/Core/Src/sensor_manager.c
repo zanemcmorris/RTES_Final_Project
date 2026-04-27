@@ -401,14 +401,14 @@ static void preprocess_imu_sample(const raw_imu_sample_t *raw,
 	proc->accel_z_mps2 = proc->accel_z_g * GRAVITY_MPS2;
 
 	// Riemann sum acceleration (mps2 * t = mps)
-	proc->vel_x_mps = proc->accel_x_mps2 * (IMU_SAMPLING_PERIOD_MS / 1000.0);
-	proc->vel_y_mps = proc->accel_y_mps2 * (IMU_SAMPLING_PERIOD_MS / 1000.0);
-	proc->vel_z_mps = proc->accel_z_mps2 * (IMU_SAMPLING_PERIOD_MS / 1000.0);
+	proc->vel_x_mps += proc->accel_x_mps2 * (IMU_SAMPLING_PERIOD_MS / 1000.0);
+	proc->vel_y_mps += proc->accel_y_mps2 * (IMU_SAMPLING_PERIOD_MS / 1000.0);
+	proc->vel_z_mps += proc->accel_z_mps2 * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 
 	// Riemann sum velocity (mps * t = m)
-	proc->pos_x_m = proc->vel_x_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
-	proc->pos_y_m = proc->vel_y_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
-	proc->pos_z_m = proc->vel_z_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
+	proc->pos_x_m += proc->vel_x_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
+	proc->pos_y_m += proc->vel_y_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
+	proc->pos_z_m += proc->vel_z_mps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 
 	// milli-dps to dps with gyro calibration remove
 	proc->gyro_x_dps = (raw->gyro_x_mdps - g_gyro_bias_x_mdps) / 1000.0f;
@@ -820,10 +820,10 @@ int32_t SensorManager_Init(void) {
 }
 
 void SensorManager_RunOnce(void) {
-	LSM6DSR_Axes_t accel = { 0 };
-	LSM6DSR_Axes_t gyro = { 0 };
-	float pressure_hpa = 0.0f;
-	float temperature_c = 0.0f;
+	static LSM6DSR_Axes_t accel = { 0 };
+	static LSM6DSR_Axes_t gyro = { 0 };
+	static float pressure_hpa = 0.0f;
+	static float temperature_c = 0.0f;
 
 	uint8_t acc_ready = 0;
 	uint8_t gyro_ready = 0;
