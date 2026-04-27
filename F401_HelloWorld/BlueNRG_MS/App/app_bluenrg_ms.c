@@ -248,7 +248,7 @@ void MX_BlueNRG_MS_Process(void)
   {
         uint32_t now_ms = HAL_GetTick();
  
-        if ((now_ms - last_telem_tick) >= 25U)   // every 25msec send one packet (20 bytes) --> So in 100msec send 80 bytes
+        if ((now_ms - last_telem_tick) >= 10U)   // every 10msec send one packet (20 bytes) --> So in 50msec send 100 bytes
         {
             last_telem_tick = now_ms;
  
@@ -261,7 +261,7 @@ void MX_BlueNRG_MS_Process(void)
                 case 0:
                 {
                     buf[0] = 0x41U;
-                    memcpy(buf +  1, &ts,                              sizeof(uint16_t));
+                    memcpy(buf +  1, &ts,                             sizeof(uint16_t));
                     memcpy(buf +  3, &g_processed_imu.accel_x_g,      sizeof(float));
                     memcpy(buf +  7, &g_processed_imu.accel_y_g,      sizeof(float));
                     memcpy(buf + 11, &g_processed_imu.accel_z_g,      sizeof(float));
@@ -274,7 +274,7 @@ void MX_BlueNRG_MS_Process(void)
                 case 1:
                 {
                     buf[0] = 0x42U;
-                    memcpy(buf +  1, &ts,                                sizeof(uint16_t));
+                    memcpy(buf +  1, &ts,                               sizeof(uint16_t));
                     memcpy(buf +  3, &g_processed_imu.gyro_x_dps,       sizeof(float));
                     memcpy(buf +  7, &g_processed_imu.gyro_y_dps,       sizeof(float));
                     memcpy(buf + 11, &g_processed_imu.gyro_z_dps,       sizeof(float));
@@ -287,7 +287,7 @@ void MX_BlueNRG_MS_Process(void)
                 case 2:
                 {
                     buf[0] = 0x43U;
-                    memcpy(buf +  1, &ts,                              sizeof(uint16_t));
+                    memcpy(buf +  1, &ts,                             sizeof(uint16_t));
                     memcpy(buf +  3, &g_processed_imu.vel_x_mps,      sizeof(float));
                     memcpy(buf +  7, &g_processed_imu.vel_y_mps,      sizeof(float));
                     memcpy(buf + 11, &g_processed_imu.vel_z_mps,      sizeof(float));
@@ -308,12 +308,23 @@ void MX_BlueNRG_MS_Process(void)
                     sendData(buf, 19U);
                     break;
                 }
+                case 4:
+                {
+                    buf[0] = 0x45U;
+                    memcpy(buf +  1, &ts,                              sizeof(uint16_t));
+                    memcpy(buf +  3, &g_processed_imu.combined_roll,   sizeof(float));
+                    memcpy(buf +  7, &g_processed_imu.combined_pitch,  sizeof(float));
+                    memcpy(buf + 11, &g_processed_imu.gyro_z_rad_abs,  sizeof(float));
+                    memcpy(buf + 15, &g_processed_imu.gyro_z_rad_abs,  sizeof(float)); // pad
+                    sendData(buf, 19U);
+                    break;
+                }
  
                 default:
                     break;
             }
  
-            pkt_toggle = (pkt_toggle + 1U) % 4U;
+            pkt_toggle = (pkt_toggle + 1U) % 5U;
         }
     }
 

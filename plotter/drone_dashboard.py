@@ -72,15 +72,7 @@ def rad_to_deg(r):
 
 
 def clamp_motor(raw_pct: float) -> float:
-    """
-    FIX for 1000% bug.
-    After scaling, if value is > 110 it means the FC was sending 0-100 range
-    but MOTOR_IS_NORMALIZED was True.  We detect and clamp gracefully.
-    """
-    if raw_pct > 110.0:
-        # FC sent 0-100 but flag said normalized; undo ×100 scale
-        return raw_pct / 100.0
-    return max(0.0, min(100.0, raw_pct))
+     return max(0.0, min(100.0, raw_pct))
 
 
 # ================= DATA STORE =================
@@ -157,18 +149,6 @@ class IMUBLEReader:
                 self.t_baro.append(now)
                 self.pres.append(pressure)
                 self.alt_m.append(pressure_to_alt_m(pressure))
-
-                roll_deg  = math.degrees(math.atan2(ay, az))
-                pitch_deg = math.degrees(math.atan2(-ax, math.hypot(ay, az)))
-                self.roll  = roll_deg
-                self.pitch = pitch_deg
-
-                # Attitude history (yaw filled from packet B)
-                self.t_att.append(now)
-                self.roll_h.append(roll_deg)
-                self.pitch_h.append(pitch_deg)
-                self.yaw_h.append(self.yaw)   # latest yaw at this moment
-
                 self.imu_samples  += 1
                 self.baro_samples += 1
 
@@ -197,11 +177,20 @@ class IMUBLEReader:
             _, ts, fr, fl, br, bl = struct.unpack(FMT, data[:19])
             with self.lock:
                 scale = 100.0 if MOTOR_IS_NORMALIZED else 1.0
-                raw   = [fl * scale, fr * scale, bl * scale, br * scale]
-                self.motors = [clamp_motor(v) for v in raw]
-                self._last_motor_update = now   # FIX: track freshness
-                self.t_motor.append(now)
-
+                self.motors = [round(clamp_motor(v * scale), 1) 
+                            for v in [fl, fr, bl, br]]
+                self._last_motor_update = now
+                
+        elif pkt == 0x45:
+            _, ts, roll_rad, pitch_rad, yaw_rad, _ = struct.unpack(FMT, data[:19])
+            with self.lock:
+                self.roll  = math.degrees(roll_rad)
+                self.pitch = math.degrees(pitch_rad)
+                self.yaw   = math.degrees(yaw_rad)
+                self.t_att.append(now)
+                self.roll_h.append(self.roll)
+                self.pitch_h.append(self.pitch)
+                self.yaw_h.append(self.yaw)
     # ──────────────────────────────────────────────────────────────────────────
     def send_command(self, cmd_name: str, param: float = None):
         """Send a command to the FC over BLE write characteristic."""
@@ -471,42 +460,32 @@ for ax_, lines in [(ax_accel, [la_x, la_y, la_z]),
                    (ax_rpy,   [lr_r, lr_p, lr_y])]:
     ax_.legend(handles=lines, fontsize=6, loc='upper right',
                facecolor='#1a1a2e', edgecolor='none', labelcolor='#aaa', ncol=3)
-
-
 # ══════════════════════════════════════════════════════════════════════════════
-# CENTRE COLUMN  —  angular rate | yaw | dps gauge | drone view
+# CENTRE COLUMN  —  angular rate | dps gauge | drone view
 # ══════════════════════════════════════════════════════════════════════════════
 ctr_gs = gridspec.GridSpecFromSubplotSpec(
-    5, 1, subplot_spec=outer[1], hspace=0.18,
-    height_ratios=[1, 1, 0.08, 0.55, 1.25])
+    4, 1, subplot_spec=outer[1], hspace=0.18,
+    height_ratios=[1, 0.08, 0.55, 1.25])
 
 ax_dps   = fig.add_subplot(ctr_gs[0])
-ax_deg   = fig.add_subplot(ctr_gs[1])
-ax_gdps  = fig.add_subplot(ctr_gs[3])
-ax_drone = fig.add_subplot(ctr_gs[4])
+ax_gdps  = fig.add_subplot(ctr_gs[2])
+ax_drone = fig.add_subplot(ctr_gs[3])
 
-for ax_ in (ax_dps, ax_deg):
-    ax_.set_facecolor(MID)
-    ax_.tick_params(labelsize=7, colors='#aaa')
-    for sp in ax_.spines.values():
-        sp.set_color('#333')
-    ax_.grid(True, color='#2a2a4a', lw=0.5)
+ax_dps.set_facecolor(MID)
+ax_dps.tick_params(labelsize=7, colors='#aaa')
+for sp in ax_dps.spines.values():
+    sp.set_color('#333')
+ax_dps.grid(True, color='#2a2a4a', lw=0.5)
 
-ax_dps.set_ylabel("dps",       fontsize=7, color='#aaa')
-ax_deg.set_ylabel("yaw (deg)", fontsize=7, color='#aaa')
-ax_dps.set_title("Angular Rate (packet B)",   fontsize=8, color='#aaa', loc='left', pad=2)
-ax_deg.set_title("Integrated Yaw (packet B)", fontsize=8, color='#aaa', loc='left', pad=2)
+ax_dps.set_ylabel("dps", fontsize=7, color='#aaa')
+ax_dps.set_title("Angular Rate (packet B)", fontsize=8, color='#aaa', loc='left', pad=2)
 
-ld_x,   = ax_dps.plot([], [], color=ACC, lw=1.2, label='gx')
-ld_y,   = ax_dps.plot([], [], color=GRN, lw=1.2, label='gy')
-ld_z,   = ax_dps.plot([], [], color=ORG, lw=1.2, label='gz')
-ld_yaw, = ax_deg.plot([], [], color=YLW, lw=1.2, label='yaw°')
+ld_x, = ax_dps.plot([], [], color=ACC, lw=1.2, label='gx')
+ld_y, = ax_dps.plot([], [], color=GRN, lw=1.2, label='gy')
+ld_z, = ax_dps.plot([], [], color=ORG, lw=1.2, label='gz')
 
 ax_dps.legend(handles=[ld_x, ld_y, ld_z], fontsize=6, loc='upper right',
               facecolor='#1a1a2e', edgecolor='none', labelcolor='#aaa', ncol=3)
-ax_deg.legend(handles=[ld_yaw], fontsize=6, loc='upper right',
-              facecolor='#1a1a2e', edgecolor='none', labelcolor='#aaa')
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RIGHT COLUMN  —  command log | motor bars
@@ -711,10 +690,6 @@ def update(_):
         ld_y.set_data(ts, d["gy"][i0:])
         ld_z.set_data(ts, d["gz"][i0:])
         safe_ylim(ax_dps, d["gx"][i0:], d["gy"][i0:], d["gz"][i0:])
-
-        ax_deg.set_xlim(te - WINDOW_SEC, te)
-        ld_yaw.set_data(ts, d["yaw_deg"][i0:])
-        safe_ylim(ax_deg, d["yaw_deg"][i0:])
 
     # ── gauges ────────────────────────────────────────────────────────────────
     amag = math.hypot(d["ax"][-1] if d["ax"] else 0.0,
