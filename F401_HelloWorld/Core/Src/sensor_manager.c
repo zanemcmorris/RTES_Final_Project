@@ -89,18 +89,14 @@ static void spi_dev_deselect(spi_device_t *dev) {
 	HAL_GPIO_WritePin(dev->cs_port, dev->cs_pin, GPIO_PIN_SET);
 }
 
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
-{
-	if (hspi->Instance == SPI2)
-	{
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
+	if (hspi->Instance == SPI2) {
 		g_spi2_dma_done = 1;
 	}
 }
 
-void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
-{
-	if (hspi->Instance == SPI2)
-	{
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
+	if (hspi->Instance == SPI2) {
 		g_spi2_dma_error = 1;
 	}
 }
@@ -138,8 +134,6 @@ static int32_t spi_bus_read_reg(spi_device_t *dev, uint8_t reg, uint8_t *pData,
 		spi_dev_deselect(dev);
 		return LSM6DSR_ERROR;
 	}
-
-
 
 	timeout_start = HAL_GetTick();
 
@@ -251,10 +245,47 @@ int32_t MX_LSM6DSR_Init(void) {
 	if (LSM6DSR_ACC_SetFullScale(&MotionSensor, fullScale) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
+	/* Accelerometer LPF2 enable */
+	if (lsm6dsr_xl_filter_lp2_set(&MotionSensor.Ctx,
+			PROPERTY_ENABLE) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
+
+	/*
+	 * Accelerometer LPF cutoff selection.
+	 * More aggressive filtering = larger divisor.
+	 * Good starting point: ODR / 10.
+	 */
+	if (lsm6dsr_xl_hp_path_on_out_set(&MotionSensor.Ctx,
+			LSM6DSR_LP_ODR_DIV_10) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
+
 	if (LSM6DSR_GYRO_SetOutputDataRate(&MotionSensor,
 			IMU_SAMPLING_FREQ) != LSM6DSR_OK)
 		return LSM6DSR_ERROR; // TODO: Make sure these enum defns match the #defined period and freq
+
 	if (LSM6DSR_GYRO_SetFullScale(&MotionSensor, LSM6DSR_250dps) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
+
+	/* Gyroscope LPF1 enable */
+	if (lsm6dsr_gy_filter_lp1_set(&MotionSensor.Ctx,
+			PROPERTY_ENABLE) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
+
+	/*
+	 * Gyroscope LPF1 bandwidth.
+	 * Options in your driver include:
+	 * LSM6DSR_ULTRA_LIGHT, VERY_LIGHT, LIGHT, MEDIUM,
+	 * STRONG, VERY_STRONG, AGGRESSIVE, XTREME.
+	 *
+	 * Medium is a reasonable starting point.
+	 */
+	if (lsm6dsr_gy_lp1_bandwidth_set(&MotionSensor.Ctx,
+			LSM6DSR_MEDIUM) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
+
+	/* Optional: mask DRDY until filters have settled */
+	if (lsm6dsr_filter_settling_mask_set(&MotionSensor.Ctx,
+			PROPERTY_ENABLE) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
 	return LSM6DSR_OK;
@@ -391,21 +422,23 @@ static void preprocess_imu_sample(const raw_imu_sample_t *raw,
 
 	// Riemann sum rps (rad per second * t = radian)
 	// Also with combined_roll and pitch feedback
-	proc->gyro_x_rad_abs = proc->combined_roll + proc->gyro_x_rps
-			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
-	proc->gyro_y_rad_abs = proc->combined_pitch + proc->gyro_y_rps
-			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
+	proc->gyro_x_rad_abs = proc->combined_roll
+			+ proc->gyro_x_rps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
+	proc->gyro_y_rad_abs = proc->combined_pitch
+			+ proc->gyro_y_rps * (IMU_SAMPLING_PERIOD_MS / 1000.0);
 	proc->gyro_z_rad_abs += proc->gyro_z_rps
 			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
 
 	proc->accel_roll = atan2f(proc->accel_y_g, proc->accel_z_g);
 	proc->accel_pitch = atan2f(-1 * proc->accel_x_g,
-			sqrtf(proc->accel_y_g * proc->accel_y_g
+			sqrtf(
+					proc->accel_y_g * proc->accel_y_g
 							+ proc->accel_z_g * proc->accel_z_g));
 
 	// Complementary filter
 	proc->combined_roll = 0.97 * proc->gyro_x_rad_abs + 0.03 * proc->accel_roll;
-	proc->combined_pitch = 0.97 * proc->gyro_y_rad_abs + 0.03 * proc->accel_pitch;
+	proc->combined_pitch = 0.97 * proc->gyro_y_rad_abs
+			+ 0.03 * proc->accel_pitch;
 
 }
 
@@ -670,7 +703,7 @@ static void vl53l0x_acquire_one_sample(void) {
 }
 
 static void calibrate_gyro_bias(void) {
-	const uint32_t num_samples = 50;
+	const uint32_t num_samples = 150;
 	uint32_t collected = 0;
 
 	int64_t sum_x = 0;
@@ -803,8 +836,6 @@ void SensorManager_RunOnce(void) {
 
 	g_imu_task_loops++;
 
-	setUserLEDTwo(0);
-
 	LSM6DSR_ACC_Get_DRDY_Status(&MotionSensor, &acc_ready);
 	LSM6DSR_GYRO_Get_DRDY_Status(&MotionSensor, &gyro_ready);
 	check_imu_fifo_status();
@@ -827,9 +858,6 @@ void SensorManager_RunOnce(void) {
 		LSM6DSR_GYRO_GetAxes(&MotionSensor, &gyro);
 		g_gyro_read_count++;
 	}
-
-	setUserLEDTwo(1);
-
 
 	g_raw_imu.timestamp_us = micros();
 	g_raw_imu.accel_x_mg = accel.x;
