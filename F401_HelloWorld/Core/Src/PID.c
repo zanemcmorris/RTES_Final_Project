@@ -11,9 +11,9 @@
 volatile motor_outputs_t g_motor_outputs = {0};
 
 // enjoy the terms!
-static PID_params_t rollPIDParams = { .70, 0.33, 0.08, 0 };
-static PID_params_t pitchPIDParams = { .70, 0.33, 0.08, 0 };
-static PID_params_t yawPIDParams = { .1, .05, .01, 0 };
+PID_params_t rollPIDParams = { .70, 0.33, 0.08, 0 };
+PID_params_t pitchPIDParams = { .70, 0.33, 0.08, 0 };
+PID_params_t yawPIDParams = { .1, .05, .01, 0 };
 PID_params_t altitudePIDParams = { .1, 0, 0, 0 };
 
 static float globalAltitudeOuput; //needed? static
@@ -59,7 +59,7 @@ void writeToMotors(motor_outputs_t* motors) {
     __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, flSetting);
 }
 
-#define ENABLE_ROLL_CONTROL (0)
+#define ENABLE_ROLL_CONTROL (1)
 #define ENABLE_PITCH_CONTROL (1)
 #define ENABLE_YAW_CONTROL (0 )
 #define ENABLE_ALT_CONTROL (0)
@@ -166,7 +166,7 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 #if ENABLE_ALT_CONTROL
 	float latestAltitude = globalAltitudeOuput;
 #else
-	float latestAltitude = 0; // Math says ~70% is hovering
+	float latestAltitude = 0.3; // Math says ~70% is hovering
 #endif
 
 	//motor mixing algo (MMA)
