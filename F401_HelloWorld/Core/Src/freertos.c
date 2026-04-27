@@ -31,14 +31,17 @@
 #include "PID.h"
 #include <stdio.h>
 #include "app_bluenrg_ms.h"
-
+#include <stdbool.h>
+#include "rtos_flags.h"
 
 #define ALTITUDE_OFFSET_M (1)
 
 extern TIM_HandleTypeDef htim4;
 extern processed_imu_sample_t g_processed_imu;
 extern processed_baro_sample_t g_processed_baro;
-
+volatile bool armMotors = true;
+extern volatile motor_outputs_t g_motor_outputs;
+const motor_outputs_t motor_zeros = {0};
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -167,7 +170,6 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
  */
 void applicationInit(void) {
 
-	int status = 0;
 	assert(SensorManager_Init() == 0);
 
 	// Primitive creation
@@ -237,10 +239,15 @@ void RPY_PID_task(void *arguments) {
 		//have GPIO pin go high here, then low at the very end of task and measure Ci with scope
 		//synchronization for 500 hz (2 ms period) from RTOS timer
 		osSemaphoreAcquire(RPYReleaseSemID, PID_SEMAPHORE_TIMEOUT); //determine proper timeout val
-		int start = micros();
-		RPY_RunControlLoop(&rpyPIDState);
-		int end = micros();
-		int diff = end - start;
+		if(armMotors){
+			int start = micros();
+			RPY_RunControlLoop(&rpyPIDState);
+			writeToMotors(&g_motor_outputs);
+			int end = micros();
+			int diff = end - start;
+		} else {
+			writeToMotors(&motor_zeros);
+		}
 	}
 }
 
@@ -333,8 +340,16 @@ void bluetoothControlTask(void *argument) {
 
 	while (1) {
 
-		osEventFlagsWait(bleEventFlags, 0x01, osFlagsWaitAny | osFlagsNoClear,
+		uint32_t flags = osEventFlagsWait(bleEventFlags, 7, osFlagsWaitAny | osFlagsNoClear,
 				10);
+
+		if(flags & FLAG_BLE_START){
+			armMotors = true;
+		}
+		if(flags & FLAG_BLE_STOP){
+			armMotors = false;
+		}
+
 		osEventFlagsClear(bleEventFlags, 0x01);
 		MX_BlueNRG_MS_Process();   // app layer
 	}

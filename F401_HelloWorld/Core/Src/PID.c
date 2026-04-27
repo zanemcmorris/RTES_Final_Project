@@ -6,12 +6,12 @@
  */
 
 #include "PID.h"
-
+#include "stm32f4xx_hal_tim.h"
 //BLE 
 volatile motor_outputs_t g_motor_outputs = {0};
 
 // enjoy the terms!
-static PID_params_t rollPIDParams = { .70, 0.33, 0.08, 0 }; // was .25,.05,.005
+static PID_params_t rollPIDParams = { .70, 0.33, 0.08, 0 };
 static PID_params_t pitchPIDParams = { .70, 0.33, 0.08, 0 };
 static PID_params_t yawPIDParams = { .1, .05, .01, 0 };
 PID_params_t altitudePIDParams = { .1, 0, 0, 0 };
@@ -28,40 +28,40 @@ extern osMutexId_t altitudeDataMutexID;
 extern processed_baro_sample_t g_processed_baro;
 extern osMutexId_t outputThrustDataMutexID;
 
-void writeToMotors(float motorFR, float motorFL, float motorBR, float motorBL) {
-	if (motorFR > 100)
-		motorFR = 100;
-	if (motorFL > 100)
-		motorFL = 100;
-	if (motorBR > 100)
-		motorBR = 100;
-	if (motorBL > 100)
-		motorBL = 100;
+void writeToMotors(motor_outputs_t* motors) {
+    if (motors->fr > 100)
+        motors->fr = 100;
+    if (motors->fl > 100)
+        motors->fl = 100;
+    if (motors->br > 100)
+        motors->br = 100;
+    if (motors->bl > 100)
+        motors->bl = 100;
 
-	if (motorFR < 0)
-		motorFR = 0;
-	if (motorFL < 0)
-		motorFL = 0;
-	if (motorBR < 0)
-		motorBR = 0;
-	if (motorBL < 0)
-		motorBL = 0;
+    if (motors->fr < 0)
+        motors->fr = 0;
+    if (motors->fl < 0)
+        motors->fl = 0;
+    if (motors->br < 0)
+        motors->br = 0;
+    if (motors->bl < 0)
+        motors->bl = 0;
 
-	//motor vals are between 0-2099, y = 2099/100 * x
-	uint32_t frSetting = 2099 * motorFR;
-	uint32_t flSetting = 2099 * motorFL;
-	uint32_t brSetting = 2099 * motorBR;
-	uint32_t blSetting = 2099 * motorBL;
+    //motor vals are between 0-2099, y = 2099/100 x
+    uint32_t frSetting = 2099 * motors->fr;
+    uint32_t flSetting = 2099 * motors->fl;
+    uint32_t brSetting = 2099 * motors->br;
+    uint32_t blSetting = 2099 * motors->bl;
 
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, blSetting);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, frSetting);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, brSetting);
-	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, flSetting);
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, blSetting);
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, frSetting);
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, brSetting);
+    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, flSetting);
 }
 
 #define ENABLE_ROLL_CONTROL (0)
-#define ENABLE_PITCH_CONTROL (0)
-#define ENABLE_YAW_CONTROL (1 )
+#define ENABLE_PITCH_CONTROL (1)
+#define ENABLE_YAW_CONTROL (0 )
 #define ENABLE_ALT_CONTROL (0)
 
 void RPY_RunControlLoop(RPY_PID_State_t *state) {
@@ -187,10 +187,6 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 		motorBL = 100;
 
 	// Post to global motor data
-
-	writeToMotors(motorFR, motorFL, motorBR, motorBL);
-
-	//BLE
 	osMutexAcquire(outputThrustDataMutexID, MUTEX_TIMEOUT);
 	g_motor_outputs.fr = motorFR;
 	g_motor_outputs.fl = motorFL;
@@ -206,9 +202,6 @@ void Altitude_RunControlLoop(Altitude_PID_State_t *state) {
 	osMutexRelease(altitudeDataMutexID);
 
 	state->currentAltitude = currentBarometerReading.altitude_m;
-//	if(state->currentAltitude == 0){
-//		continue;
-//	}
 
 	float dt;
 	if (state->isFirstRun) {

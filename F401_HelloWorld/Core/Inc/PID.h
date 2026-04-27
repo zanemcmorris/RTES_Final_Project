@@ -12,8 +12,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-
-
 #include "FreeRTOS.h"
 #include "task.h"
 //#include "main.h"
@@ -26,7 +24,6 @@
 #include "sensor_manager.h"
 #include "PID.h"
 
-
 #define MAX_OUTPUT 100 //no clue
 
 #define PID_SEMAPHORE_TIMEOUT 25
@@ -36,15 +33,14 @@
 #define FILTER_ALPHA 0.98f
 
 //tuning: start at 5, then
-#define ROLL_MAX_I 10.0f //assuming motor output of 0-100, 10-15
-#define PITCH_MAX_I 10.0f
-#define YAW_MAX_I 20.0f //20-25
-#define ALT_MAX_I 10.0f
-
+#define ROLL_MAX_I 2.0f //assuming motor output of 0-100, 10-15
+#define PITCH_MAX_I 2.0f
+#define YAW_MAX_I 2.0f //20-25
+#define ALT_MAX_I 2.0f
 
 //BLE - motor
 typedef struct {
-    float fr, fl, br, bl; 
+	float fr, fl, br, bl;
 } motor_outputs_t;
 extern volatile motor_outputs_t g_motor_outputs;
 
@@ -63,26 +59,19 @@ typedef struct {
 	bool initialized;
 } IMU_vals_t;
 
-
-
-
-
-
-
 typedef struct {
-    float rollIntegral;
-    float rollLastError;
-    float pitchIntegral;
-    float pitchLastError;
-    float yawIntegral;
-    float yawLastError;
-    uint32_t lastTimestampUs;
-    bool isFirstRun;
-    IMU_vals_t currentState;
+	float rollIntegral;
+	float rollLastError;
+	float pitchIntegral;
+	float pitchLastError;
+	float yawIntegral;
+	float yawLastError;
+	uint32_t lastTimestampUs;
+	bool isFirstRun;
+	IMU_vals_t currentState;
 } RPY_PID_State_t;
 
-
-typedef struct{
+typedef struct {
 	float altitudeIntegral;
 	float altitudeLastError;
 	float altDerivativeFiltered;
@@ -91,12 +80,8 @@ typedef struct{
 	bool isFirstRun;
 } Altitude_PID_State_t;
 
-
-
-
-
 void RPY_RunControlLoop(RPY_PID_State_t *state);
 void Altitude_RunControlLoop(Altitude_PID_State_t *state);
-void writeToMotors(float motorFR, float motorFL, float motorBR, float motorBL) ;
+void writeToMotors(motor_outputs_t* motors);
 
 #endif /* SRC_PID_H_ */

@@ -1,20 +1,20 @@
 /**
-  ******************************************************************************
-  * @file    App/sample_service.c
-  * @author  SRA Application Team
-  * @brief   Add a sample service using a vendor specific profile
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    App/sample_service.c
+ * @author  SRA Application Team
+ * @brief   Add a sample service using a vendor specific profile
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2026 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 
 /* Includes ------------------------------------------------------------------*/
 #include "sample_service.h"
@@ -22,7 +22,10 @@
 #include "bluenrg_gatt_aci.h"
 #include "bluenrg_hal_aci.h"
 
+#include "FreeRTOS.h"
+#include "cmsis_os2.h"
 #include "custom.h"
+#include "rtos_flags.h"
 
 /** @addtogroup Applications
  *  @{
@@ -56,6 +59,8 @@ uint16_t sampleServHandle, TXCharHandle, RXCharHandle;
 
 extern uint8_t bnrg_expansion_board;
 extern BLE_RoleTypeDef BLE_Role;
+
+extern osEventFlagsId_t bleEventFlags;
 /**
  * @}
  */
@@ -83,38 +88,45 @@ extern BLE_RoleTypeDef BLE_Role;
  * @param  None
  * @retval Status
  */
-tBleStatus Add_Sample_Service(void)
-{
-  tBleStatus ret;
+tBleStatus Add_Sample_Service(void) {
+	tBleStatus ret;
 
-  /*
-  UUIDs:
-  D973F2E0-B19E-11E2-9E96-0800200C9A66
-  D973F2E1-B19E-11E2-9E96-0800200C9A66
-  D973F2E2-B19E-11E2-9E96-0800200C9A66
-  */
+	/*
+	 UUIDs:
+	 D973F2E0-B19E-11E2-9E96-0800200C9A66
+	 D973F2E1-B19E-11E2-9E96-0800200C9A66
+	 D973F2E2-B19E-11E2-9E96-0800200C9A66
+	 */
 
-  const uint8_t service_uuid[16] = {0x66,0x9a,0x0c,0x20,0x00,0x08,0x96,0x9e,0xe2,0x11,0x9e,0xb1,0xe0,0xf2,0x73,0xd9};
-  const uint8_t charUuidTX[16] = {0x66,0x9a,0x0c,0x20,0x00,0x08,0x96,0x9e,0xe2,0x11,0x9e,0xb1,0xe1,0xf2,0x73,0xd9};
-  const uint8_t charUuidRX[16] = {0x66,0x9a,0x0c,0x20,0x00,0x08,0x96,0x9e,0xe2,0x11,0x9e,0xb1,0xe2,0xf2,0x73,0xd9};
+	const uint8_t service_uuid[16] = { 0x66, 0x9a, 0x0c, 0x20, 0x00, 0x08, 0x96,
+			0x9e, 0xe2, 0x11, 0x9e, 0xb1, 0xe0, 0xf2, 0x73, 0xd9 };
+	const uint8_t charUuidTX[16] = { 0x66, 0x9a, 0x0c, 0x20, 0x00, 0x08, 0x96,
+			0x9e, 0xe2, 0x11, 0x9e, 0xb1, 0xe1, 0xf2, 0x73, 0xd9 };
+	const uint8_t charUuidRX[16] = { 0x66, 0x9a, 0x0c, 0x20, 0x00, 0x08, 0x96,
+			0x9e, 0xe2, 0x11, 0x9e, 0xb1, 0xe2, 0xf2, 0x73, 0xd9 };
 
-  ret = aci_gatt_add_serv(UUID_TYPE_128, service_uuid, PRIMARY_SERVICE, 7, &sampleServHandle); /* original is 9?? */
-  if (ret != BLE_STATUS_SUCCESS) goto fail;
+	ret = aci_gatt_add_serv(UUID_TYPE_128, service_uuid, PRIMARY_SERVICE, 7,
+			&sampleServHandle); /* original is 9?? */
+	if (ret != BLE_STATUS_SUCCESS)
+		goto fail;
 
-  ret =  aci_gatt_add_char(sampleServHandle, UUID_TYPE_128, charUuidTX, 20, CHAR_PROP_NOTIFY, ATTR_PERMISSION_NONE, 0,
-                           16, 1, &TXCharHandle);
-  if (ret != BLE_STATUS_SUCCESS) goto fail;
+	ret = aci_gatt_add_char(sampleServHandle, UUID_TYPE_128, charUuidTX, 20,
+			CHAR_PROP_NOTIFY, ATTR_PERMISSION_NONE, 0, 16, 1, &TXCharHandle);
+	if (ret != BLE_STATUS_SUCCESS)
+		goto fail;
 
-  ret =  aci_gatt_add_char(sampleServHandle, UUID_TYPE_128, charUuidRX, 20, CHAR_PROP_WRITE|CHAR_PROP_WRITE_WITHOUT_RESP, ATTR_PERMISSION_NONE, GATT_NOTIFY_ATTRIBUTE_WRITE,
-                           16, 1, &RXCharHandle);
-  if (ret != BLE_STATUS_SUCCESS) goto fail;
+	ret = aci_gatt_add_char(sampleServHandle, UUID_TYPE_128, charUuidRX, 20,
+			CHAR_PROP_WRITE | CHAR_PROP_WRITE_WITHOUT_RESP,
+			ATTR_PERMISSION_NONE, GATT_NOTIFY_ATTRIBUTE_WRITE, 16, 1,
+			&RXCharHandle);
+	if (ret != BLE_STATUS_SUCCESS)
+		goto fail;
 
-  PRINTF("Sample Service added.\nTX Char Handle %04X, RX Char Handle %04X\n", TXCharHandle, RXCharHandle);
-  return BLE_STATUS_SUCCESS;
+	PRINTF("Sample Service added.\nTX Char Handle %04X, RX Char Handle %04X\n", TXCharHandle, RXCharHandle);
+	return BLE_STATUS_SUCCESS;
 
-fail:
-  PRINTF("Error while adding Sample Service.\n");
-  return BLE_STATUS_ERROR ;
+	fail: PRINTF("Error while adding Sample Service.\n");
+	return BLE_STATUS_ERROR;
 }
 
 /**
@@ -122,46 +134,48 @@ fail:
  * @param  None
  * @retval None
  */
-void Make_Connection(void)
-{
-  tBleStatus ret;
+void Make_Connection(void) {
+	tBleStatus ret;
 
-  if(BLE_Role == CLIENT) {
+	if (BLE_Role == CLIENT) {
 
-    printf("Client Create Connection\n");
-    tBDAddr bdaddr = {0xaa, 0x00, 0x00, 0xE1, 0x80, 0x02};
+		printf("Client Create Connection\n");
+		tBDAddr bdaddr = { 0xaa, 0x00, 0x00, 0xE1, 0x80, 0x02 };
 
-    BSP_LED_On(LED2); //To indicate the start of the connection and discovery phase
+		BSP_LED_On(LED2); //To indicate the start of the connection and discovery phase
 
-    /*
-    Scan_Interval, Scan_Window, Peer_Address_Type, Peer_Address, Own_Address_Type, Conn_Interval_Min,
-    Conn_Interval_Max, Conn_Latency, Supervision_Timeout, Conn_Len_Min, Conn_Len_Max
-    */
-    ret = aci_gap_create_connection(SCAN_P, SCAN_L, PUBLIC_ADDR, bdaddr, PUBLIC_ADDR, CONN_P1, CONN_P2, 0,
-                                    SUPERV_TIMEOUT, CONN_L1 , CONN_L2);
+		/*
+		 Scan_Interval, Scan_Window, Peer_Address_Type, Peer_Address, Own_Address_Type, Conn_Interval_Min,
+		 Conn_Interval_Max, Conn_Latency, Supervision_Timeout, Conn_Len_Min, Conn_Len_Max
+		 */
+		ret = aci_gap_create_connection(SCAN_P, SCAN_L, PUBLIC_ADDR, bdaddr,
+				PUBLIC_ADDR, CONN_P1, CONN_P2, 0,
+				SUPERV_TIMEOUT, CONN_L1, CONN_L2);
 
-    if (ret != 0){
-      printf("Error while starting connection.\n");
-      HAL_Delay(100);
-    }
+		if (ret != 0) {
+			printf("Error while starting connection.\n");
+			HAL_Delay(100);
+		}
 
-  } else  {
+	} else {
 
-    const char local_name[] = {AD_TYPE_COMPLETE_LOCAL_NAME,'B','l','u','e','N','R','G','_','C','h','a','t'};
+		const char local_name[] = { AD_TYPE_COMPLETE_LOCAL_NAME, 'B', 'l', 'u',
+				'e', 'N', 'R', 'G', '_', 'C', 'h', 'a', 't' };
 
-    /* disable scan response */
-    hci_le_set_scan_resp_data(0,NULL);
+		/* disable scan response */
+		hci_le_set_scan_resp_data(0, NULL);
 
-    PRINTF("General Discoverable Mode ");
-    /*
-    Advertising_Event_Type, Adv_Interval_Min, Adv_Interval_Max, Address_Type, Adv_Filter_Policy,
-    Local_Name_Length, Local_Name, Service_Uuid_Length, Service_Uuid_List, Slave_Conn_Interval_Min,
-    Slave_Conn_Interval_Max
-    */
-    ret = aci_gap_set_discoverable(ADV_DATA_TYPE, ADV_INTERV_MIN, ADV_INTERV_MAX, PUBLIC_ADDR,
-                                   NO_WHITE_LIST_USE, 13, local_name, 0, NULL, 0, 0);
-    PRINTF("%d\n",ret);
-  }
+		PRINTF("General Discoverable Mode ");
+		/*
+		 Advertising_Event_Type, Adv_Interval_Min, Adv_Interval_Max, Address_Type, Adv_Filter_Policy,
+		 Local_Name_Length, Local_Name, Service_Uuid_Length, Service_Uuid_List, Slave_Conn_Interval_Min,
+		 Slave_Conn_Interval_Max
+		 */
+		ret = aci_gap_set_discoverable(ADV_DATA_TYPE, ADV_INTERV_MIN,
+				ADV_INTERV_MAX, PUBLIC_ADDR,
+				NO_WHITE_LIST_USE, 13, local_name, 0, NULL, 0, 0);
+		PRINTF("%d\n",ret);
+	}
 }
 
 /**
@@ -169,16 +183,16 @@ void Make_Connection(void)
  * @param  None
  * @retval None
  */
-void startReadTXCharHandle(void)
-{
-  if (!start_read_tx_char_handle)
-  {
-    PRINTF("Start reading TX Char Handle\n");
+void startReadTXCharHandle(void) {
+	if (!start_read_tx_char_handle) {
+		PRINTF("Start reading TX Char Handle\n");
 
-    const uint8_t charUuid128_TX[16] = {0x66,0x9a,0x0c,0x20,0x00,0x08,0x96,0x9e,0xe2,0x11,0x9e,0xb1,0xe1,0xf2,0x73,0xd9};
-    aci_gatt_disc_charac_by_uuid(connection_handle, 0x0001, 0xFFFF, UUID_TYPE_128, charUuid128_TX);
-    start_read_tx_char_handle = TRUE;
-  }
+		const uint8_t charUuid128_TX[16] = { 0x66, 0x9a, 0x0c, 0x20, 0x00, 0x08,
+				0x96, 0x9e, 0xe2, 0x11, 0x9e, 0xb1, 0xe1, 0xf2, 0x73, 0xd9 };
+		aci_gatt_disc_charac_by_uuid(connection_handle, 0x0001, 0xFFFF,
+				UUID_TYPE_128, charUuid128_TX);
+		start_read_tx_char_handle = TRUE;
+	}
 }
 
 /**
@@ -186,16 +200,16 @@ void startReadTXCharHandle(void)
  * @param  None
  * @retval None
  */
-void startReadRXCharHandle(void)
-{
-  if (!start_read_rx_char_handle)
-  {
-    PRINTF("Start reading RX Char Handle\n");
+void startReadRXCharHandle(void) {
+	if (!start_read_rx_char_handle) {
+		PRINTF("Start reading RX Char Handle\n");
 
-    const uint8_t charUuid128_RX[16] = {0x66,0x9a,0x0c,0x20,0x00,0x08,0x96,0x9e,0xe2,0x11,0x9e,0xb1,0xe2,0xf2,0x73,0xd9};
-    aci_gatt_disc_charac_by_uuid(connection_handle, 0x0001, 0xFFFF, UUID_TYPE_128, charUuid128_RX);
-    start_read_rx_char_handle = TRUE;
-  }
+		const uint8_t charUuid128_RX[16] = { 0x66, 0x9a, 0x0c, 0x20, 0x00, 0x08,
+				0x96, 0x9e, 0xe2, 0x11, 0x9e, 0xb1, 0xe2, 0xf2, 0x73, 0xd9 };
+		aci_gatt_disc_charac_by_uuid(connection_handle, 0x0001, 0xFFFF,
+				UUID_TYPE_128, charUuid128_RX);
+		start_read_rx_char_handle = TRUE;
+	}
 }
 
 /**
@@ -205,14 +219,13 @@ void startReadRXCharHandle(void)
  * @param  Nb_bytes : number of bytes to be received
  * @retval None
  */
-void receiveData(uint8_t* data_buffer, uint8_t Nb_bytes)
-{
-  BSP_LED_Toggle(LED2);
+void receiveData(uint8_t *data_buffer, uint8_t Nb_bytes) {
+	BSP_LED_Toggle(LED2);
 
-  for(int i = 0; i < Nb_bytes; i++) {
-    printf("%c", data_buffer[i]);
-  }
-  fflush(stdout);
+	for (int i = 0; i < Nb_bytes; i++) {
+		printf("%c", data_buffer[i]);
+	}
+	fflush(stdout);
 }
 
 /**
@@ -222,14 +235,14 @@ void receiveData(uint8_t* data_buffer, uint8_t Nb_bytes)
  * @param  Nb_bytes : number of bytes to send
  * @retval None
  */
-void sendData(uint8_t* data_buffer, uint8_t Nb_bytes)
-{
-  if(BLE_Role == SERVER) {
-    aci_gatt_update_char_value(sampleServHandle,TXCharHandle, 0, Nb_bytes, data_buffer);
-  }
-  else {
-    aci_gatt_write_without_response(connection_handle, rx_handle+1, Nb_bytes, data_buffer);
-  }
+void sendData(uint8_t *data_buffer, uint8_t Nb_bytes) {
+	if (BLE_Role == SERVER) {
+		aci_gatt_update_char_value(sampleServHandle, TXCharHandle, 0, Nb_bytes,
+				data_buffer);
+	} else {
+		aci_gatt_write_without_response(connection_handle, rx_handle + 1,
+				Nb_bytes, data_buffer);
+	}
 }
 
 /**
@@ -237,17 +250,18 @@ void sendData(uint8_t* data_buffer, uint8_t Nb_bytes)
  * @param  None
  * @retval None
  */
-void enableNotification(void)
-{
-  uint8_t client_char_conf_data[] = {0x01, 0x00}; // Enable notifications
+void enableNotification(void) {
+	uint8_t client_char_conf_data[] = { 0x01, 0x00 }; // Enable notifications
 
-  uint32_t tickstart = HAL_GetTick();
+	uint32_t tickstart = HAL_GetTick();
 
-  while(aci_gatt_write_charac_descriptor(connection_handle, tx_handle+2, 2, client_char_conf_data)==BLE_STATUS_NOT_ALLOWED){
-    /* Radio is busy */
-    if ((HAL_GetTick() - tickstart) > (10*HCI_DEFAULT_TIMEOUT_MS)) break;
-  }
-  notification_enabled = TRUE;
+	while (aci_gatt_write_charac_descriptor(connection_handle, tx_handle + 2, 2,
+			client_char_conf_data) == BLE_STATUS_NOT_ALLOWED) {
+		/* Radio is busy */
+		if ((HAL_GetTick() - tickstart) > (10 * HCI_DEFAULT_TIMEOUT_MS))
+			break;
+	}
+	notification_enabled = TRUE;
 }
 
 /**
@@ -260,10 +274,8 @@ void enableNotification(void)
 // void Attribute_Modified_CB(uint16_t handle, uint8_t data_length, uint8_t *att_data)
 // {
 //   if(handle == RXCharHandle + 1){
-     
 //       FCU_CMD_Dispatch(att_data, data_length); 
 //     //HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
-
 //    // printf("Package ACK\n");
 //    // HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
 //    //  receiveData(att_data, data_length);
@@ -272,61 +284,65 @@ void enableNotification(void)
 //        notification_enabled = TRUE;
 //   }
 // }
-
 /*
-We need to command drone to do stuff
-*/
-void Attribute_Modified_CB(uint16_t handle, uint8_t data_length, uint8_t *att_data)
-{
-    if (handle == RXCharHandle + 1)
-    {
-        printf("CMD rx len=%u:", data_length);
-        for (uint8_t i = 0; i < data_length; i++){
-            printf(" %02X", att_data[i]);
-        }
+ We need to command drone to do stuff
+ */
+void Attribute_Modified_CB(uint16_t handle, uint8_t data_length,
+		uint8_t *att_data) {
+	if (handle == RXCharHandle + 1) {
+		printf("CMD rx len=%u:", data_length);
+		for (uint8_t i = 0; i < data_length; i++) {
+			printf(" %02X", att_data[i]);
+		}
 
-        printf("\r\n");
- 
-        // 5 byte packet: cmd_id (1 byte) + param float(4 bytes) 
-        if (data_length >= 5)
-        {
-            // Passing Command ID instead of 
-            uint8_t cmd_id = att_data[0];
-          
-            //For Left and Right commands 
-            float param;
-            memcpy(&param, &att_data[1], sizeof(float)); 
- 
-            switch (cmd_id)
-            {
-                case 0x01: printf("CMD: START\r\n");                       break;
-                case 0x02: printf("CMD: STOP\r\n");                        break;
-                case 0x03: printf("CMD: HOVER\r\n");                       break;
-                case 0x04: printf("CMD: LAND\r\n");                        break;
-                case 0x05: printf("CMD: MOVE_LEFT %.2f m/s\r\n", param);   break;
-                case 0x06: printf("CMD: MOVE_RIGHT %.2f m/s\r\n", param);  break;
-                default:   printf("CMD: unknown 0x%02X param=%.3f\r\n",
-                                  cmd_id, param);                           break;
-            }
-        }
-        else
-        {
-            printf("CMD: packet too short (%u bytes)\r\n", data_length);
-        }
-    }
-    else if (handle == TXCharHandle + 2)
-    {
-        if (att_data[0] == 0x01)
-        {
-            notification_enabled = TRUE;
-            printf("notifications enabled\r\n");   /* ADD THIS LINE */
-        }
-        else
-        {
-            notification_enabled = FALSE;
-            printf("notifications disabled\r\n");
-        }
-    }
+		printf("\r\n");
+
+		// 5 byte packet: cmd_id (1 byte) + param float(4 bytes)
+		if (data_length >= 5) {
+			// Passing Command ID instead of
+			uint8_t cmd_id = att_data[0];
+
+			//For Left and Right commands
+			float param;
+			memcpy(&param, &att_data[1], sizeof(float));
+
+			switch (cmd_id) {
+			case 0x01:
+				printf("CMD: START\r\n");
+				osEventFlagsSet(bleEventFlags, FLAG_BLE_START);
+				break;
+			case 0x02:
+				printf("CMD: STOP\r\n");
+				osEventFlagsSet(bleEventFlags, FLAG_BLE_STOP);
+				break;
+			case 0x03:
+				printf("CMD: HOVER\r\n");
+				break;
+			case 0x04:
+				printf("CMD: LAND\r\n");
+				break;
+			case 0x05:
+				printf("CMD: MOVE_LEFT %.2f m/s\r\n", param);
+				break;
+			case 0x06:
+				printf("CMD: MOVE_RIGHT %.2f m/s\r\n", param);
+				break;
+			default:
+				printf("CMD: unknown 0x%02X param=%.3f\r\n", cmd_id, param);
+				break;
+			}
+		} else {
+			printf("CMD: packet too short (%u bytes)\r\n", data_length);
+		}
+	} else if (handle == TXCharHandle + 2) {
+		if (att_data[0] == 0x01) {
+			notification_enabled = TRUE;
+			printf("notifications enabled\r\n"); /* ADD THIS LINE */
+		} else {
+			notification_enabled = FALSE;
+			printf("notifications disabled\r\n");
+		}
+	}
 }
 /**
  * @brief  This function is called when there is a LE Connection Complete event.
@@ -334,16 +350,15 @@ void Attribute_Modified_CB(uint16_t handle, uint8_t data_length, uint8_t *att_da
  * @param  handle : Connection handle
  * @retval None
  */
-void GAP_ConnectionComplete_CB(uint8_t addr[6], uint16_t handle)
-{
-  connected = TRUE;
-  connection_handle = handle;
+void GAP_ConnectionComplete_CB(uint8_t addr[6], uint16_t handle) {
+	connected = TRUE;
+	connection_handle = handle;
 
-  printf("Connected to device:");
-  for(int i = 5; i > 0; i--){
-    printf("%02X-", addr[i]);
-  }
-  printf("%02X\n", addr[0]);
+	printf("Connected to device:");
+	for (int i = 5; i > 0; i--) {
+		printf("%02X-", addr[i]);
+	}
+	printf("%02X\n", addr[0]);
 }
 
 /**
@@ -351,18 +366,17 @@ void GAP_ConnectionComplete_CB(uint8_t addr[6], uint16_t handle)
  * @param  None
  * @retval None
  */
-void GAP_DisconnectionComplete_CB(void)
-{
-  connected = FALSE;
+void GAP_DisconnectionComplete_CB(void) {
+	connected = FALSE;
 
-  printf("Disconnected\n");
-  /* Make the device connectable again. */
-  set_connectable = TRUE;
-  notification_enabled = FALSE;
-  start_read_tx_char_handle = FALSE;
-  start_read_rx_char_handle = FALSE;
-  end_read_tx_char_handle = FALSE;
-  end_read_rx_char_handle = FALSE;
+	printf("Disconnected\n");
+	/* Make the device connectable again. */
+	set_connectable = TRUE;
+	notification_enabled = FALSE;
+	start_read_tx_char_handle = FALSE;
+	start_read_rx_char_handle = FALSE;
+	end_read_tx_char_handle = FALSE;
+	end_read_rx_char_handle = FALSE;
 }
 
 /**
@@ -372,11 +386,11 @@ void GAP_DisconnectionComplete_CB(void)
  * @param  attr_value  Attribute value in the notification
  * @retval None
  */
-void GATT_Notification_CB(uint16_t attr_handle, uint8_t attr_len, uint8_t *attr_value)
-{
-  if (attr_handle == tx_handle+1) {
-    receiveData(attr_value, attr_len);
-  }
+void GATT_Notification_CB(uint16_t attr_handle, uint8_t attr_len,
+		uint8_t *attr_value) {
+	if (attr_handle == tx_handle + 1) {
+		receiveData(attr_value, attr_len);
+	}
 }
 
 /**
@@ -386,100 +400,94 @@ void GATT_Notification_CB(uint16_t attr_handle, uint8_t attr_len, uint8_t *attr_
  * @param  pData  Pointer to the ACI packet
  * @retval None
  */
-void user_notify(void * pData)
-{
-  hci_uart_pckt *hci_pckt = pData;
-  /* obtain event packet */
-  hci_event_pckt *event_pckt = (hci_event_pckt*)hci_pckt->data;
+void user_notify(void *pData) {
+	hci_uart_pckt *hci_pckt = pData;
+	/* obtain event packet */
+	hci_event_pckt *event_pckt = (hci_event_pckt*) hci_pckt->data;
 
-  if(hci_pckt->type != HCI_EVENT_PKT)
-    return;
+	if (hci_pckt->type != HCI_EVENT_PKT)
+		return;
 
-  switch(event_pckt->evt){
+	switch (event_pckt->evt) {
 
-  case EVT_DISCONN_COMPLETE:
-    {
-      GAP_DisconnectionComplete_CB();
-    }
-    break;
+	case EVT_DISCONN_COMPLETE: {
+		GAP_DisconnectionComplete_CB();
+	}
+		break;
 
-  case EVT_LE_META_EVENT:
-    {
-      evt_le_meta_event *evt = (void *)event_pckt->data;
+	case EVT_LE_META_EVENT: {
+		evt_le_meta_event *evt = (void*) event_pckt->data;
 
-      switch(evt->subevent){
-      case EVT_LE_CONN_COMPLETE:
-        {
-          evt_le_connection_complete *cc = (void *)evt->data;
-          GAP_ConnectionComplete_CB(cc->peer_bdaddr, cc->handle);
-        }
-        break;
-      }
-    }
-    break;
+		switch (evt->subevent) {
+		case EVT_LE_CONN_COMPLETE: {
+			evt_le_connection_complete *cc = (void*) evt->data;
+			GAP_ConnectionComplete_CB(cc->peer_bdaddr, cc->handle);
+		}
+			break;
+		}
+	}
+		break;
 
-  case EVT_VENDOR:
-    {
-      evt_blue_aci *blue_evt = (void*)event_pckt->data;
-      switch(blue_evt->ecode){
+	case EVT_VENDOR: {
+		evt_blue_aci *blue_evt = (void*) event_pckt->data;
+		switch (blue_evt->ecode) {
 
-      case EVT_BLUE_GATT_ATTRIBUTE_MODIFIED:
-        {
-          if (bnrg_expansion_board == IDB05A1) {
-            evt_gatt_attr_modified_IDB05A1 *evt = (evt_gatt_attr_modified_IDB05A1*)blue_evt->data;
-            Attribute_Modified_CB(evt->attr_handle, evt->data_length, evt->att_data);
-          }
-          else {
-            evt_gatt_attr_modified_IDB04A1 *evt = (evt_gatt_attr_modified_IDB04A1*)blue_evt->data;
-            Attribute_Modified_CB(evt->attr_handle, evt->data_length, evt->att_data);
-          }
+		case EVT_BLUE_GATT_ATTRIBUTE_MODIFIED: {
+			if (bnrg_expansion_board == IDB05A1) {
+				evt_gatt_attr_modified_IDB05A1 *evt =
+						(evt_gatt_attr_modified_IDB05A1*) blue_evt->data;
+				Attribute_Modified_CB(evt->attr_handle, evt->data_length,
+						evt->att_data);
+			} else {
+				evt_gatt_attr_modified_IDB04A1 *evt =
+						(evt_gatt_attr_modified_IDB04A1*) blue_evt->data;
+				Attribute_Modified_CB(evt->attr_handle, evt->data_length,
+						evt->att_data);
+			}
 
-        }
-        break;
-      case EVT_BLUE_GATT_NOTIFICATION:
-        {
-          evt_gatt_attr_notification *evt = (evt_gatt_attr_notification*)blue_evt->data;
-          GATT_Notification_CB(evt->attr_handle, evt->event_data_length - 2, evt->attr_value);
-        }
-        break;
-      case EVT_BLUE_GATT_DISC_READ_CHAR_BY_UUID_RESP:
-        if(BLE_Role == CLIENT) {
-          PRINTF("EVT_BLUE_GATT_DISC_READ_CHAR_BY_UUID_RESP\n");
+		}
+			break;
+		case EVT_BLUE_GATT_NOTIFICATION: {
+			evt_gatt_attr_notification *evt =
+					(evt_gatt_attr_notification*) blue_evt->data;
+			GATT_Notification_CB(evt->attr_handle, evt->event_data_length - 2,
+					evt->attr_value);
+		}
+			break;
+		case EVT_BLUE_GATT_DISC_READ_CHAR_BY_UUID_RESP:
+			if (BLE_Role == CLIENT) {
+				PRINTF("EVT_BLUE_GATT_DISC_READ_CHAR_BY_UUID_RESP\n");
 
-          evt_gatt_disc_read_char_by_uuid_resp *resp = (void*)blue_evt->data;
+				evt_gatt_disc_read_char_by_uuid_resp *resp =
+						(void*) blue_evt->data;
 
-          if (start_read_tx_char_handle && !end_read_tx_char_handle)
-          {
-            tx_handle = resp->attr_handle;
-            printf("TX Char Handle %04X\n", tx_handle);
-          }
-          else if (start_read_rx_char_handle && !end_read_rx_char_handle)
-          {
-            rx_handle = resp->attr_handle;
-            printf("RX Char Handle %04X\n", rx_handle);
-          }
-        }
-        break;
+				if (start_read_tx_char_handle && !end_read_tx_char_handle) {
+					tx_handle = resp->attr_handle;
+					printf("TX Char Handle %04X\n", tx_handle);
+				} else if (start_read_rx_char_handle
+						&& !end_read_rx_char_handle) {
+					rx_handle = resp->attr_handle;
+					printf("RX Char Handle %04X\n", rx_handle);
+				}
+			}
+			break;
 
-      case EVT_BLUE_GATT_PROCEDURE_COMPLETE:
-        if(BLE_Role == CLIENT) {
-          /* Wait for gatt procedure complete event trigger related to Discovery Charac by UUID */
-          //evt_gatt_procedure_complete *pr = (void*)blue_evt->data;
-
-          if (start_read_tx_char_handle && !end_read_tx_char_handle)
-          {
-            end_read_tx_char_handle = TRUE;
-          }
-          else if (start_read_rx_char_handle && !end_read_rx_char_handle)
-          {
-            end_read_rx_char_handle = TRUE;
-          }
-        }
-        break;
-      }
-    }
-    break;
-  }
+		case EVT_BLUE_GATT_PROCEDURE_COMPLETE:
+			if (BLE_Role == CLIENT) {
+				/* Wait for gatt procedure complete event trigger related to Discovery Charac by UUID */
+				//evt_gatt_procedure_complete *pr = (void*)blue_evt->data;
+				if (start_read_tx_char_handle && !end_read_tx_char_handle) {
+					end_read_tx_char_handle = TRUE;
+				} else if (start_read_rx_char_handle
+						&& !end_read_rx_char_handle) {
+					end_read_rx_char_handle = TRUE;
+				}
+			}
+			break;
+		}
+	}
+		break;
+	}
 }
 /**
  * @}
