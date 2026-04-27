@@ -271,7 +271,7 @@ async def ble_loop():
     while True:
         try:
             log("BLE connecting…", prefix="  ")
-            async with BleakClient(ADDRESS, timeout=10.0) as client:
+            async with BleakClient(ADDRESS, timeout=5.0) as client:
                 reader._ble_client = client
                 with reader.lock:
                     reader.ble_connected = True
@@ -287,7 +287,7 @@ async def ble_loop():
             reader._ble_client = None
             with reader.lock:
                 reader.ble_connected = False
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(1.0)
 
 
 def start_ble():
