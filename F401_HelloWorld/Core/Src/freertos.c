@@ -90,6 +90,8 @@ const osMutexAttr_t outputThrustDataMutexAttr = { "outputThrustDataMutex", // hu
 		0U                                        // size for control block
 		};
 osMutexId_t outputThrustDataMutexID;
+osMutexId_t pidMutex;
+
 
 osSemaphoreId_t RPYReleaseSemID;
 osSemaphoreId_t altitudeReleaseSemID;
@@ -184,6 +186,10 @@ void applicationInit(void) {
 
 	outputThrustDataMutexID = osMutexNew(&outputThrustDataMutexAttr);
 	assert(outputThrustDataMutexID != NULL);
+
+    pidMutex = osMutexNew(NULL);
+	assert(pidMutex != NULL);
+
 
 	RPYReleaseSemID = osSemaphoreNew(1, 1, NULL);
 	assert(RPYReleaseSemID != NULL);

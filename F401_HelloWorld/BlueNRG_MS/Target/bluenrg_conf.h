@@ -53,10 +53,12 @@ extern "C" {
 #define CONN_L2      2000
 /*---------- Advertising Type -----------*/
 #define ADV_DATA_TYPE      ADV_IND
+
+//Likhita : Reduced these values for advertising quicker or else it takes 1sec almost 
 /*---------- Minimum Advertising Interval (for a number N, Time = N x 0.625 msec) -----------*/
-#define ADV_INTERV_MIN      2048
+#define ADV_INTERV_MIN      32
 /*---------- Maximum Advertising Interval (for a number N, Time = N x 0.625 msec) -----------*/
-#define ADV_INTERV_MAX      4096
+#define ADV_INTERV_MAX      64
 /*---------- Minimum Connection Event Interval (for a number N, Time = N x 1.25 msec) -----------*/
 #define L2CAP_INTERV_MIN      9
 /*---------- Maximum Connection Event Interval (for a number N, Time = N x 1.25 msec) -----------*/
