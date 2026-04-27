@@ -382,7 +382,7 @@ void bluetoothControlTask(void *argument) {
 	while (1) {
 
 		uint32_t flags = osEventFlagsWait(bleEventFlags, 7, osFlagsWaitAny | osFlagsNoClear,
-				10);
+				osWaitForever);
 
 		if(flags & FLAG_BLE_START){
 			armMotors = true;

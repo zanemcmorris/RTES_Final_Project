@@ -59,9 +59,47 @@ void writeToMotors(motor_outputs_t* motors) {
     __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, flSetting);
 }
 
+float duty_from_thrust(float thrust01)
+{
+    const float a = 8.030303f;
+    const float b = 5.827273f;
+    const float c = -0.606667f;
+
+    // Model-predicted thrust at duty = 1.0
+    const float max_thrust_g = a + b + c;  // about 13.2509 g
+
+    if (thrust01 <= 0.0f) {
+        return 0.0f;
+    }
+
+    if (thrust01 >= 1.0f) {
+        return 1.0f;
+    }
+
+    float target_thrust_g = thrust01 * max_thrust_g;
+
+    float discriminant = b * b - 4.0f * a * (c - target_thrust_g);
+
+    if (discriminant < 0.0f) {
+        return 0.0f;
+    }
+
+    float duty = (-b + sqrtf(discriminant)) / (2.0f * a);
+
+    if (duty < 0.0f) {
+        duty = 0.0f;
+    }
+
+    if (duty > 1.0f) {
+        duty = 1.0f;
+    }
+
+    return duty;
+}
+
 #define ENABLE_ROLL_CONTROL (1)
 #define ENABLE_PITCH_CONTROL (1)
-#define ENABLE_YAW_CONTROL (0 )
+#define ENABLE_YAW_CONTROL (0)
 #define ENABLE_ALT_CONTROL (0)
 
 void RPY_RunControlLoop(RPY_PID_State_t *state) {
@@ -188,10 +226,10 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 
 	// Post to global motor data
 	osMutexAcquire(outputThrustDataMutexID, MUTEX_TIMEOUT);
-	g_motor_outputs.fr = motorFR;
-	g_motor_outputs.fl = motorFL;
-	g_motor_outputs.br = motorBR;
-	g_motor_outputs.bl = motorBL;
+	g_motor_outputs.fr = duty_from_thrust(motorFR);
+	g_motor_outputs.fl = duty_from_thrust(motorFL);
+	g_motor_outputs.br = duty_from_thrust(motorBR);
+	g_motor_outputs.bl = duty_from_thrust(motorBL);
 	osMutexRelease(outputThrustDataMutexID);
 }
 
