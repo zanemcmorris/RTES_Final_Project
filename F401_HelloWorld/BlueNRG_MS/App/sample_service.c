@@ -21,11 +21,18 @@
 #include "bluenrg_gap_aci.h"
 #include "bluenrg_gatt_aci.h"
 #include "bluenrg_hal_aci.h"
-
+#include "PID.h"
 #include "FreeRTOS.h"
 #include "cmsis_os2.h"
 #include "custom.h"
 #include "rtos_flags.h"
+
+extern osMutexId_t pidMutex;
+extern PID_params_t altitudePIDParams;
+extern PID_params_t rollPIDParams;
+extern PID_params_t pitchPIDParams;
+extern PID_params_t yawPIDParams;
+
 
 /** @addtogroup Applications
  *  @{
@@ -142,7 +149,7 @@ void Make_Connection(void) {
 		printf("Client Create Connection\n");
 		tBDAddr bdaddr = { 0xaa, 0x00, 0x00, 0xE1, 0x80, 0x02 };
 
-		BSP_LED_On(LED2); //To indicate the start of the connection and discovery phase
+	//	BSP_LED_On(LED2); //To indicate the start of the connection and discovery phase
 
 		/*
 		 Scan_Interval, Scan_Window, Peer_Address_Type, Peer_Address, Own_Address_Type, Conn_Interval_Min,
@@ -220,7 +227,7 @@ void startReadRXCharHandle(void) {
  * @retval None
  */
 void receiveData(uint8_t *data_buffer, uint8_t Nb_bytes) {
-	BSP_LED_Toggle(LED2);
+	//BSP_LED_Toggle(LED2);
 
 	for (int i = 0; i < Nb_bytes; i++) {
 		printf("%c", data_buffer[i]);
@@ -322,11 +329,91 @@ void Attribute_Modified_CB(uint16_t handle, uint8_t data_length,
 				printf("CMD: LAND\r\n");
 				break;
 			case 0x05:
-				printf("CMD: MOVE_LEFT %.2f m/s\r\n", param);
+				printf("CMD: ROLL Kp %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				rollPIDParams.kp = param;
+				osMutexRelease(pidMutex);
+				printf("ROLL Kp = %.2f\r\n", rollPIDParams.kp);
 				break;
 			case 0x06:
-				printf("CMD: MOVE_RIGHT %.2f m/s\r\n", param);
+				printf("CMD: ROLL INTEGRATION %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				rollPIDParams.ki = param;
+				osMutexRelease(pidMutex);
+				printf("ROLL Ki = %.2f\r\n", rollPIDParams.ki);
 				break;
+			case 0x07:
+				printf("CMD: ROLL DERIVATIVE %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				rollPIDParams.kd = param;
+				osMutexRelease(pidMutex);
+				printf("ROLL Kd = %.2f\r\n", rollPIDParams.kd);
+				break;
+			case 0x08:
+				printf("CMD: PITCH PROPORTIONAL %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				pitchPIDParams.kp = param;
+				osMutexRelease(pidMutex);
+				printf("PITCH Kp = %.2f\r\n", pitchPIDParams.kp);
+				break;
+			case 0x09:
+				printf("CMD: PITCH INTEGRATION %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				pitchPIDParams.ki = param;
+				osMutexRelease(pidMutex);
+				printf("PITCH Ki = %.2f\r\n", pitchPIDParams.ki);
+				break;
+			case 0x0A:
+				printf("CMD: PITCH DERIVATIVE %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				pitchPIDParams.kd = param;
+				osMutexRelease(pidMutex);
+				printf("PITCH Kd = %.2f\r\n", pitchPIDParams.kd);				
+				break;
+			case 0x0B:
+				printf("CMD: YAW PROPORTIONAL %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				yawPIDParams.kp = param;
+				osMutexRelease(pidMutex);
+				printf("YAW Kp = %.2f\r\n", yawPIDParams.kp);	
+				break;
+			case 0x0C:
+				printf("CMD: YAW INTEGRATION %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				yawPIDParams.ki = param;
+				osMutexRelease(pidMutex);
+				printf("YAW Ki = %.2f\r\n", yawPIDParams.ki);
+				break;
+			case 0x0D:
+				printf("CMD: YAW DERIVATIVE %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				yawPIDParams.kd = param;
+				osMutexRelease(pidMutex);
+				printf("YAW Kd = %.2f\r\n", yawPIDParams.kd);
+				break;
+			case 0x0E:
+				printf("CMD: ALTITUDE PROPORTIONAL %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				altitudePIDParams.kp = param;
+				osMutexRelease(pidMutex);
+				printf("ALTITUDE Kp = %.2f\r\n", altitudePIDParams.kp);
+				break;
+			case 0x0F:
+				printf("CMD: ALTITUDE INTEGRATION %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				altitudePIDParams.ki = param;
+				osMutexRelease(pidMutex);
+				printf("ALTITUDE Ki = %.2f\r\n", altitudePIDParams.ki);
+				break;
+			case 0x10:
+				printf("CMD: ALTITUDE DERIVATIVE %.2f m/s\r\n", param);
+				osMutexAcquire(pidMutex, osWaitForever);
+				altitudePIDParams.kd = param;
+				osMutexRelease(pidMutex);
+				printf("YAW Kd = %.2f\r\n", altitudePIDParams.kd);
+				break;
+			// case 0x11:
+			// 	printf("CMD: MOVE_RIGHT %.2f m/s\r\n", param);
 			default:
 				printf("CMD: unknown 0x%02X param=%.3f\r\n", cmd_id, param);
 				break;
