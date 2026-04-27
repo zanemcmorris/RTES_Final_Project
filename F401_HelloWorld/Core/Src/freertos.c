@@ -381,8 +381,13 @@ void bluetoothControlTask(void *argument) {
 
 	while (1) {
 
-		uint32_t flags = osEventFlagsWait(bleEventFlags, 7, osFlagsWaitAny | osFlagsNoClear,
-				osWaitForever);
+		uint32_t flags = osEventFlagsWait(bleEventFlags, 7, osFlagsWaitAny,
+				10);
+
+		if(flags == osFlagsErrorTimeout){
+			MX_BlueNRG_MS_Process();   // app layer
+			continue;
+		}
 
 		if(flags & FLAG_BLE_START){
 			armMotors = true;
@@ -390,9 +395,6 @@ void bluetoothControlTask(void *argument) {
 		if(flags & FLAG_BLE_STOP){
 			armMotors = false;
 		}
-
-		osEventFlagsClear(bleEventFlags, 0x01);
-		MX_BlueNRG_MS_Process();   // app layer
 	}
 }
 /* USER CODE END Application */
