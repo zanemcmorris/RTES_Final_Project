@@ -54,6 +54,16 @@
 #endif
 #ifndef CMSIS_device_header
 #define CMSIS_device_header "stm32f4xx.h"
+#define configGENERATE_RUN_TIME_STATS         1
+#define configUSE_STATS_FORMATTING_FUNCTIONS  1
+
+#define INCLUDE_uxTaskGetStackHighWaterMark2  1
+
+extern void ConfigureRuntimeStatsTimer(void);
+extern uint32_t GetRuntimeStatsCounter(void);
+
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()    ConfigureRuntimeStatsTimer()
+#define portGET_RUN_TIME_COUNTER_VALUE()            GetRuntimeStatsCounter()
 #endif /* CMSIS_device_header */
 
 #define configENABLE_FPU                         1

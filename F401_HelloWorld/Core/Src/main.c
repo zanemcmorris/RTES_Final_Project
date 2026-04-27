@@ -160,6 +160,18 @@ static void dwt_init(void) {
 	DWT->CYCCNT = 0;                                 // reset counter
 	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;             // enable counter
 }
+
+void ConfigureRuntimeStatsTimer(void)
+{
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CYCCNT = 0;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+uint32_t GetRuntimeStatsCounter(void)
+{
+    return DWT->CYCCNT;
+}
 /* USER CODE END 0 */
 
 /**

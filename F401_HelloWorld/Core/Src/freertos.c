@@ -63,7 +63,7 @@ osThreadAttr_t altitudeTaskAttr = { .name = "altitudePIDTask", .priority =
 osThreadId_t altitudeTaskID;
 
 osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority =
-		osPriorityLow, .stack_size = 1024 };
+		osPriorityLow, .stack_size = 1500 };
 osThreadId_t uartCommTaskID;
 
 osThreadAttr_t bleCommTaskAttr = { .name = "bleComm", .priority = osPriorityLow,
@@ -175,6 +175,24 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 	__disable_irq();
 	while (1) {
 	}
+}
+
+void PrintFreeRTOSStats(void)
+{
+    char buf[512];
+
+    memset(buf, 0, sizeof(buf));
+
+    snprintf(buf, sizeof(buf),
+             "\r\nTask          Abs Time      %% Time\r\n"
+             "--------------------------------------\r\n");
+
+    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
+
+    memset(buf, 0, sizeof(buf));
+    vTaskGetRunTimeStats(buf);
+
+    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
 }
 /* USER CODE END 4 */
 
@@ -307,7 +325,8 @@ void uartCommTask(void *argument) {
 	osDelay(200);
 
 	while (1) {
-		osDelay(200);
+		osDelay(2000);
+		PrintFreeRTOSStats();
 	}
 }
 
