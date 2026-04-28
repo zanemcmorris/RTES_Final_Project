@@ -11,10 +11,12 @@
 volatile motor_outputs_t g_motor_outputs = {0};
 
 // enjoy the terms!
-PID_params_t rollPIDParams = { .70, 0.33, 0.08, 0 };
-PID_params_t pitchPIDParams = { .70, 0.33, 0.08, 0 };
-PID_params_t yawPIDParams = { .1, .05, .01, 0 };
-PID_params_t altitudePIDParams = { .1, 0, 0, 0 };
+PID_params_t rollPIDParams = { 0.45, 0.15, 0.11, 0 };
+PID_params_t pitchPIDParams = { 0.25, 0.03, 0.09, 0 };
+PID_params_t yawPIDParams =  { 0.5, 0.02, 0, 0 };
+PID_params_t altitudePIDParams =  { 0, 0, 0, 0 };
+
+#define BASE_THRUST (0.3f)
 
 static float globalAltitudeOuput; //needed? static
 // Filter coefficient for the D-term (0.0 to 1.0)
@@ -99,7 +101,7 @@ float duty_from_thrust(float thrust01)
 
 #define ENABLE_ROLL_CONTROL (1)
 #define ENABLE_PITCH_CONTROL (1)
-#define ENABLE_YAW_CONTROL (0)
+#define ENABLE_YAW_CONTROL (1)
 #define ENABLE_ALT_CONTROL (0)
 
 void RPY_RunControlLoop(RPY_PID_State_t *state) {
@@ -204,15 +206,15 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 #if ENABLE_ALT_CONTROL
 	float latestAltitude = globalAltitudeOuput;
 #else
-	float latestAltitude = 0.3; // Math says ~70% is hovering
+	float latestAltitude = BASE_THRUST + globalAltitudeOuput; // Math says ~70% is hovering
 #endif
 
 	//motor mixing algo (MMA)
 	// TODO: Add these to BLE telemetry - motor values are in [0,1]
-	float motorFR = latestAltitude + yawOutput + pitchOutput + rollOutput;
-	float motorFL = latestAltitude - yawOutput + pitchOutput - rollOutput;
-	float motorBR = latestAltitude - yawOutput - pitchOutput + rollOutput;
-	float motorBL = latestAltitude + yawOutput - pitchOutput - rollOutput;
+	float motorFR = latestAltitude - yawOutput + pitchOutput + rollOutput;
+	float motorFL = latestAltitude + yawOutput + pitchOutput - rollOutput;
+	float motorBR = latestAltitude + yawOutput - pitchOutput + rollOutput;
+	float motorBL = latestAltitude - yawOutput - pitchOutput - rollOutput;
 
 	//cap output at 100% (?)
 	if (motorFR > 100)
