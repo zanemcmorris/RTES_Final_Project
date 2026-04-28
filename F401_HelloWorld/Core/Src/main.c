@@ -21,11 +21,14 @@
 #include "cmsis_os.h"
 #include "app_bluenrg_ms.h"
 
+
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "lsm6dsr.h"
 extern void applicationInit(void);
 #include <stdio.h>
+#include "sensor_manager.h"
 
 /* USER CODE END Includes */
 
@@ -407,7 +410,7 @@ static void MX_TIM2_Init(void) {
      * This matches:
      * 1000 ms / 417 Hz = 2.398 ms
      */
-    htim2.Init.Period = 2397;
+    htim2.Init.Period = 1000*IMU_SAMPLING_PERIOD_MS;
 
     htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
     htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
