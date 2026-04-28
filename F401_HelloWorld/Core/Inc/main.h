@@ -73,6 +73,9 @@ void Error_Handler(void);
 #define BLE_RSTN_Pin GPIO_PIN_2
 #define BLE_RSTN_GPIO_Port GPIOB
 
+#define VL53L0X_INT_Pin GPIO_PIN_1
+#define VL53L0X_INT_GPIO_Port GPIOA
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

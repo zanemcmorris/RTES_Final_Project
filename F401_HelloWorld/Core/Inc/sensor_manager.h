@@ -31,11 +31,6 @@ extern "C" {
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
 extern I2C_HandleTypeDef hi2c2;
-
-extern volatile uint32_t g_sensor_runonce_cycles_last;
-extern volatile uint32_t g_sensor_runonce_cycles_max;
-extern volatile uint32_t g_sensor_runonce_cycles_min;
-
 typedef struct
 {
     SPI_HandleTypeDef *hspi;
@@ -143,10 +138,17 @@ typedef struct
     uint8_t valid;
 } processed_tof_sample_t;
 
+extern processed_tof_sample_t g_processed_tof;
+
 int32_t SensorManager_Init(void);
 void SensorManager_RunOnce(void);
 int32_t MX_LSM6DSR_Init(void);
 int32_t MX_LPS22HH_Init(void);
+//void vl53l0x_acquire_one_sample(void);
+int32_t vl53l0x_api_init_device(void);
+void vl53l0x_cfg_INT(void);
+void vl53l0x_start_next_measurement(void);
+
 
 #ifdef __cplusplus
 }

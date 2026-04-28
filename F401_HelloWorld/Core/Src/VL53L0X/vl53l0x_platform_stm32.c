@@ -152,6 +152,6 @@ VL53L0X_Error VL53L0X_UpdateByte(VL53L0X_DEV Dev, uint8_t index, uint8_t AndData
 VL53L0X_Error VL53L0X_PollingDelay(VL53L0X_DEV Dev)
 {
     (void)Dev;
-    osDelay(5);
+    HAL_Delay(5);
     return VL53L0X_ERROR_NONE;
 }

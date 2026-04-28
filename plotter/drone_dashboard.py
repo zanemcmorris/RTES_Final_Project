@@ -83,13 +83,6 @@ def vec3_mag(a, b, c):
 
 
 # ================= PID SHADOW TABLE =================
-# Mirrors PID.c static params so the GCS shows current values.
-# Updated whenever user sends a tuning command.
-# These match the initial values in PID.c:
-#   rollPIDParams   = { .70, 0.33, 0.08, 0 }
-#   pitchPIDParams  = { .70, 0.33, 0.08, 0 }
-#   yawPIDParams    = { .1,  .05,  .01,  0 }
-#   altitudePIDParams = { .1, 0, 0, 0 }
 _pid_lock = threading.Lock()
 _pid_shadow = {
     'roll':  {'p': 0.70, 'i': 0.33, 'd': 0.08},
@@ -150,7 +143,7 @@ class IMUBLEReader:
         self.motors             = [0.0, 0.0, 0.0, 0.0]  # [FL, FR, BL, BR] 0–100%
         self._last_motor_update = 0.0
 
-        # Packet E  0x45 : attitude roll/pitch/yaw (rad) — AUTHORITATIVE
+        # Packet E  0x45 : attitude roll/pitch/yaw (rad) + ToF range (m)
         self.t_att   = collections.deque(maxlen=maxlen)
         self.roll_h  = collections.deque(maxlen=maxlen)
         self.pitch_h = collections.deque(maxlen=maxlen)
@@ -158,6 +151,11 @@ class IMUBLEReader:
         self.roll    = 0.0
         self.pitch   = 0.0
         self.yaw     = 0.0
+
+        # ToF — parsed from the 4th float of Packet E
+        self.t_tof    = collections.deque(maxlen=maxlen)
+        self.tof_m    = collections.deque(maxlen=maxlen)
+        self.tof_range = 0.0
 
         self.start_time    = time.monotonic()
         self.imu_samples   = 0
@@ -183,7 +181,6 @@ class IMUBLEReader:
                 self.baro_samples += 1
 
         elif pkt == 0x42:
-            # Store gyro only; yaw scalar comes exclusively from 0x45
             _, ts, gx, gy, gz, _ = struct.unpack(FMT, data[:19])
             with self.lock:
                 self.t_gyro.append(now)
@@ -205,8 +202,8 @@ class IMUBLEReader:
                 self._last_motor_update = now
 
         elif pkt == 0x45:
-            # Authoritative attitude — roll, pitch, yaw all from here only
-            _, ts, roll_rad, pitch_rad, yaw_rad, _ = struct.unpack(FMT, data[:19])
+            # 4th float is ToF range_m (replaces old pad)
+            _, ts, roll_rad, pitch_rad, yaw_rad, range_m = struct.unpack(FMT, data[:19])
             with self.lock:
                 self.roll  = math.degrees(roll_rad)
                 self.pitch = math.degrees(pitch_rad)
@@ -215,13 +212,12 @@ class IMUBLEReader:
                 self.roll_h.append(self.roll)
                 self.pitch_h.append(self.pitch)
                 self.yaw_h.append(self.yaw)
+                self.tof_range = range_m
+                self.t_tof.append(now)
+                self.tof_m.append(range_m)
 
     # ──────────────────────────────────────────────────────────────────────────
     def send_command(self, cmd_name: str, param: float) -> tuple[bool, str]:
-        """
-        Send a 5-byte command to the FC.
-        param is always required — caller must supply it.
-        """
         entry = FCU_CMD.get(cmd_name.upper())
         if entry is None:
             return False, f"unknown command: {cmd_name}"
@@ -247,10 +243,6 @@ class IMUBLEReader:
 
     # ──────────────────────────────────────────────────────────────────────────
     def snapshot(self):
-        """
-        Return windowed data only. Uses bisect for O(log n) slicing.
-        Lock is held only during the copy — minimises contention with BLE thread.
-        """
         with self.lock:
             now        = time.monotonic() - self.start_time
             t_cutoff   = now - WINDOW_SEC
@@ -268,6 +260,7 @@ class IMUBLEReader:
             tg, gx,  gy,  gz         = _slice(self.t_gyro,  self.gx, self.gy, self.gz)
             tv, vx,  vy,  vz, pos_z  = _slice(self.t_vel,   self.vx, self.vy, self.vz, self.pos_z)
             ta, rh,  ph,  yh         = _slice(self.t_att,   self.roll_h, self.pitch_h, self.yaw_h)
+            tt, tof                  = _slice(self.t_tof,   self.tof_m)
 
             return {
                 "t": t, "ax": ax, "ay": ay, "az": az,
@@ -275,6 +268,8 @@ class IMUBLEReader:
                 "t_gyro": tg, "gx": gx, "gy": gy, "gz": gz,
                 "t_vel": tv, "vx": vx, "vy": vy, "vz": vz, "pos_z": pos_z,
                 "t_att": ta, "roll_h": rh, "pitch_h": ph, "yaw_h": yh,
+                "t_tof": tt, "tof_m": tof,
+                "tof_range":   self.tof_range,
                 "motors":      list(self.motors),
                 "motor_stale": motor_stale,
                 "roll":  self.roll, "pitch": self.pitch, "yaw": self.yaw,
@@ -293,7 +288,6 @@ def notification_handler(sender, data):
 
 
 async def ble_loop():
-    # FIX: get_running_loop() — get_event_loop() deprecated in Python 3.10+
     reader._ble_loop = asyncio.get_running_loop()
     while True:
         try:
@@ -396,7 +390,6 @@ def draw_drone_top(ax_obj, roll_deg, pitch_deg, motors, stale=False):
 
 
 def draw_pid_table(ax_obj, pid):
-    """Render live PID gains as a mini table in the given axes."""
     ax_obj.clear()
     ax_obj.set_facecolor('#12122a')
     ax_obj.axis('off')
@@ -408,7 +401,6 @@ def draw_pid_table(ax_obj, pid):
         ("Yaw",   pid['yaw']['p'],   pid['yaw']['i'],   pid['yaw']['d']),
         ("Alt",   pid['alt']['p'],   pid['alt']['i'],   pid['alt']['d']),
     ]
-    col_colors = [['#1a1a2e']*4]*5
     cell_text  = [[f"{v:.4f}" if isinstance(v, float) else v for v in row] for row in rows]
     tbl = ax_obj.table(
         cellText=cell_text,
@@ -460,22 +452,23 @@ outer = gridspec.GridSpec(1, 3, figure=fig, wspace=0.30,
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# LEFT COLUMN  —  accel | velocity | pos_z | RPY | gauges
+# LEFT COLUMN  —  accel | velocity | pos_z | tof | RPY | gauges
 # ══════════════════════════════════════════════════════════════════════════════
 left_gs = gridspec.GridSpecFromSubplotSpec(
-    6, 1, subplot_spec=outer[0], hspace=0.22,
-    height_ratios=[1, 1, 0.8, 1, 0.08, 0.65])
+    7, 1, subplot_spec=outer[0], hspace=0.22,
+    height_ratios=[1, 1, 0.8, 0.8, 1, 0.08, 0.65])
 
 ax_accel = fig.add_subplot(left_gs[0])
 ax_vel   = fig.add_subplot(left_gs[1])
 ax_pos   = fig.add_subplot(left_gs[2])
-ax_rpy   = fig.add_subplot(left_gs[3])
+ax_tof   = fig.add_subplot(left_gs[3])   # ToF range
+ax_rpy   = fig.add_subplot(left_gs[4])
 
-gauge_gs = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=left_gs[5])
+gauge_gs = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=left_gs[6])
 ax_ga    = fig.add_subplot(gauge_gs[0])
 ax_gv    = fig.add_subplot(gauge_gs[1])
 
-for ax_ in (ax_accel, ax_vel, ax_pos, ax_rpy):
+for ax_ in (ax_accel, ax_vel, ax_pos, ax_tof, ax_rpy):
     ax_.set_facecolor(MID)
     ax_.tick_params(labelsize=7, colors='#aaa')
     for sp in ax_.spines.values():
@@ -485,10 +478,12 @@ for ax_ in (ax_accel, ax_vel, ax_pos, ax_rpy):
 ax_accel.set_ylabel("accel (g)",  fontsize=7, color='#aaa')
 ax_vel.set_ylabel("vel (m/s)",    fontsize=7, color='#aaa')
 ax_pos.set_ylabel("pos_z (m)",    fontsize=7, color='#aaa')
+ax_tof.set_ylabel("range (m)",    fontsize=7, color='#aaa')
 ax_rpy.set_ylabel("degrees (°)",  fontsize=7, color='#aaa')
 ax_accel.set_title("Acceleration (packet A)",     fontsize=8, color='#aaa', loc='left', pad=2)
 ax_vel.set_title("Velocity (packet C)",           fontsize=8, color='#aaa', loc='left', pad=2)
 ax_pos.set_title("Position Z (packet C)",         fontsize=8, color='#aaa', loc='left', pad=2)
+ax_tof.set_title("ToF Range (packet E)",          fontsize=8, color='#aaa', loc='left', pad=2)
 ax_rpy.set_title("Attitude — Roll/Pitch/Yaw",     fontsize=8, color='#aaa', loc='left', pad=2)
 
 la_x, = ax_accel.plot([], [], color=ACC, lw=1.2, label='ax')
@@ -498,6 +493,7 @@ lv_x, = ax_vel.plot([],   [], color=ACC, lw=1.2, label='vx')
 lv_y, = ax_vel.plot([],   [], color=GRN, lw=1.2, label='vy')
 lv_z, = ax_vel.plot([],   [], color=ORG, lw=1.2, label='vz')
 lp_z, = ax_pos.plot([],   [], color=YLW, lw=1.2, label='pos_z')
+lt_r, = ax_tof.plot([],   [], color=PNK, lw=1.2, label='tof_m')
 lr_r, = ax_rpy.plot([],   [], color=ACC, lw=1.3, label='Roll')
 lr_p, = ax_rpy.plot([],   [], color=GRN, lw=1.3, label='Pitch')
 lr_y, = ax_rpy.plot([],   [], color=PNK, lw=1.3, label='Yaw', linestyle='--')
@@ -506,6 +502,7 @@ ax_rpy.axhline(0, color='#444', lw=0.6, linestyle=':')
 for ax_, lines in [(ax_accel, [la_x,la_y,la_z]),
                    (ax_vel,   [lv_x,lv_y,lv_z]),
                    (ax_pos,   [lp_z]),
+                   (ax_tof,   [lt_r]),
                    (ax_rpy,   [lr_r,lr_p,lr_y])]:
     ax_.legend(handles=lines, fontsize=6, loc='upper right',
                facecolor='#1a1a2e', edgecolor='none', labelcolor='#aaa', ncol=3)
@@ -546,7 +543,7 @@ rgt_gs = gridspec.GridSpecFromSubplotSpec(
 
 ax_cmd   = fig.add_subplot(rgt_gs[0])
 ax_motor = fig.add_subplot(rgt_gs[1])
-ax_pid   = fig.add_subplot(rgt_gs[2])   # ← NEW: live PID table
+ax_pid   = fig.add_subplot(rgt_gs[2])
 
 ax_cmd.set_facecolor(MID); ax_cmd.axis('off')
 ax_cmd.set_title("Command interpreter", fontsize=8, color='#aaa', loc='left', pad=2)
@@ -625,7 +622,6 @@ def on_key(event):
         if cmd:
             log(raw)
 
-            # ── built-ins ──────────────────────────────────────────────────
             if cmd in BUILTIN_CMDS:
                 resp = BUILTIN_CMDS[cmd]
                 if resp == '__clear__':
@@ -636,13 +632,11 @@ def on_key(event):
                     for line in resp.split('\n'):
                         log(line, prefix="  ")
 
-            # ── FC alias (start / stop / hover / land) — no param needed ──
             elif cmd in FC_ALIASES:
                 fc_key = FC_ALIASES[cmd]
                 ok, msg = reader.send_command(fc_key, 0.0)
                 log(msg, prefix="  " if ok else "! ")
 
-            # ── PID tuning: "rp 0.8"  "pd 0.05"  etc. ────────────────────
             else:
                 parts = cmd.split()
                 cmd_upper = parts[0].upper()
@@ -656,7 +650,6 @@ def on_key(event):
                             val = float(parts[1])
                             ok, msg = reader.send_command(cmd_upper, val)
                             if ok:
-                                # Update local shadow so PID table refreshes immediately
                                 pid_shadow_update(cmd_upper, val)
                             log(msg, prefix="  " if ok else "! ")
                         except ValueError:
@@ -698,6 +691,13 @@ def update(_):
         set_xlim_from(tv, ax_pos)
         lp_z.set_data(tv, d["pos_z"])
         safe_ylim(ax_pos, d["pos_z"])
+
+    # ── ToF ───────────────────────────────────────────────────────────────────
+    tt = d["t_tof"]
+    if tt:
+        set_xlim_from(tt, ax_tof)
+        lt_r.set_data(tt, d["tof_m"])
+        safe_ylim(ax_tof, d["tof_m"])
 
     # ── RPY ───────────────────────────────────────────────────────────────────
     ta = d["t_att"]
@@ -753,10 +753,11 @@ def update(_):
     # ── status bar ────────────────────────────────────────────────────────────
     alt_str = f"{d['alt_m'][-1]:.2f} m" if d["alt_m"] else "--"
     pz_str  = f"{d['pos_z'][-1]:.2f} m" if d["pos_z"] else "--"
+    tof_str = f"{d['tof_range']:.3f} m" if d["t_tof"] else "--"
     status_txt.set_text(
         f"IMU: {d['imu_samples']}  BARO: {d['baro_samples']}  "
         f"Roll: {d['roll']:+.1f}°  Pitch: {d['pitch']:+.1f}°  "
-        f"Yaw: {d['yaw']:+.1f}°  BaroAlt: {alt_str}  FC pos_z: {pz_str}"
+        f"Yaw: {d['yaw']:+.1f}°  BaroAlt: {alt_str}  FC pos_z: {pz_str}  ToF: {tof_str}"
     )
     return []
 

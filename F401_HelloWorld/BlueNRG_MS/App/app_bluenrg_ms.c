@@ -315,7 +315,7 @@ void MX_BlueNRG_MS_Process(void)
                     memcpy(buf +  3, &g_processed_imu.combined_roll,   sizeof(float));
                     memcpy(buf +  7, &g_processed_imu.combined_pitch,  sizeof(float));
                     memcpy(buf + 11, &g_processed_imu.gyro_z_rad_abs,  sizeof(float));
-                    memcpy(buf + 15, &g_processed_imu.gyro_z_rad_abs,  sizeof(float)); // pad
+                    memcpy(buf + 15, &g_processed_tof.range_m,         sizeof(float));
                     sendData(buf, 19U);
                     break;
                 }
