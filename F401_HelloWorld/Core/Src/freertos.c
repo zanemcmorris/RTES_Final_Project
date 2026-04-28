@@ -193,6 +193,24 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 	}
 }
 
+/*void PrintFreeRTOSStats(void)
+{
+    char buf[512];
+
+    memset(buf, 0, sizeof(buf));
+
+    snprintf(buf, sizeof(buf),
+             "\r\nTask          Abs Time      %% Time\r\n"
+             "--------------------------------------\r\n");
+
+    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
+
+    memset(buf, 0, sizeof(buf));
+    vTaskGetRunTimeStats(buf);
+
+    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
+}*/
+
 void PrintFreeRTOSStats(void)
 {
     char buf[512];
@@ -207,6 +225,34 @@ void PrintFreeRTOSStats(void)
 
     memset(buf, 0, sizeof(buf));
     vTaskGetRunTimeStats(buf);
+
+    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
+
+    /*
+     * Snapshot the volatile timing variables once.
+     * This avoids reading them multiple times while SensorManager_RunOnce()
+     * may be updating them in the IMU task.
+     */
+    uint32_t last_cycles = g_sensor_runonce_cycles_last;
+    uint32_t min_cycles  = g_sensor_runonce_cycles_min;
+    uint32_t max_cycles  = g_sensor_runonce_cycles_max;
+
+    /*
+     * CPU clock is 84 MHz, so:
+     * 84 cycles = 1 microsecond.
+     */
+    uint32_t last_us = last_cycles / 84U;
+    uint32_t min_us  = min_cycles / 84U;
+    uint32_t max_us  = max_cycles / 84U;
+
+    memset(buf, 0, sizeof(buf));
+
+    snprintf(buf, sizeof(buf),
+             "\r\nSensorManager_RunOnce:\r\n"
+             "cycles: last=%lu, min=%lu, max=%lu\r\n"
+             "time:   last=%lu us, min=%lu us, max=%lu us\r\n",
+             last_cycles, min_cycles, max_cycles,
+             last_us, min_us, max_us);
 
     HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
 }
@@ -264,8 +310,8 @@ void applicationInit(void) {
 	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
 	assert(uartCommTaskID != 0);
 
-	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
-	assert(bleCommTaskID != 0);
+//	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
+//	assert(bleCommTaskID != 0);
 
 	RPYTaskID = osThreadNew(RPY_PID_task, NULL, &RPYTaskAttr);
 	assert(RPYTaskID != 0);
@@ -369,10 +415,10 @@ void IMUAcquisitionTask(void *argument) {
 
 	while (1) {
 
-		int start = micros();
+		//int start = micros();
 		SensorManager_RunOnce();
-		int end = micros();
-		int diff = end - start;
+		//int end = micros();
+		//int diff = end - start;
 		osDelay(IMU_SAMPLING_PERIOD_MS);
 	}
 }
@@ -420,8 +466,13 @@ void bluetoothControlTask(void *argument) {
 
 	while (1) {
 
-		uint32_t flags = osEventFlagsWait(bleEventFlags, 7, osFlagsWaitAny | osFlagsNoClear,
+		uint32_t flags = osEventFlagsWait(bleEventFlags, 7, osFlagsWaitAny,
 				10);
+
+		if(flags == osFlagsErrorTimeout){
+			MX_BlueNRG_MS_Process();   // app layer
+			continue;
+		}
 
 		if(flags & FLAG_BLE_START){
 			armMotors = true;
@@ -429,9 +480,6 @@ void bluetoothControlTask(void *argument) {
 		if(flags & FLAG_BLE_STOP){
 			armMotors = false;
 		}
-
-		osEventFlagsClear(bleEventFlags, 0x01);
-		MX_BlueNRG_MS_Process();   // app layer
 	}
 }
 /* USER CODE END Application */
