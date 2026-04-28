@@ -16,6 +16,7 @@
 
 extern osMutexId_t IMUDataMutexID;
 extern osMutexId_t altitudeDataMutexID;
+extern osMutexId_t tofDataMutexID;
 
 static volatile debug_output_mode_t g_debug_output_mode = DEBUG_OUT_STAT;
 
@@ -58,7 +59,7 @@ static uint16_t g_imu_fifo_last_samples = 0;
 static uint32_t g_imu_fifo_drained_samples = 0;
 
 static raw_tof_sample_t g_raw_tof = { 0 };
-static processed_tof_sample_t g_processed_tof = { 0 };
+processed_tof_sample_t g_processed_tof = { 0 };
 
 static uint32_t micros(void) {
 	return (uint32_t) ((HAL_GetTick() * 1000U)
@@ -350,7 +351,8 @@ int32_t MX_LPS22HH_Init(void) {
 	return LPS22HH_OK;
 }
 
-static VL53L0X_Error vl53l0x_api_init_device(void) {
+//00msec - as per datasheet
+int32_t vl53l0x_api_init_device(void) {
 	VL53L0X_Error status;
 	uint8_t vhv_settings = 0;
 	uint8_t phase_cal = 0;
@@ -674,20 +676,20 @@ static void vl53l0x_single_range_test(void) {
 	vl53l0x_uart_send_line(msg);
 }
 
-static void vl53l0x_acquire_one_sample(void) {
+void vl53l0x_acquire_one_sample(void) {
 	VL53L0X_Error status;
 	VL53L0X_RangingMeasurementData_t measurement;
 
-	status = vl53l0x_api_init_device();
-	if (status != VL53L0X_ERROR_NONE) {
-		g_raw_tof.timestamp_us = micros();
-		g_raw_tof.range_mm = 0;
-		g_raw_tof.range_status = (uint8_t) status;
-		g_raw_tof.valid = 0;
+	// status = vl53l0x_api_init_device();
+	// if (status != VL53L0X_ERROR_NONE) {
+	// 	g_raw_tof.timestamp_us = micros();
+	// 	g_raw_tof.range_mm = 0;
+	// 	g_raw_tof.range_status = (uint8_t) status;
+	// 	g_raw_tof.valid = 0;
 
-		preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
-		return;
-	}
+	// 	preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
+	// 	return;
+	// }
 
 	status = VL53L0X_PerformSingleRangingMeasurement(&g_vl53l0x_dev,
 			&measurement);
@@ -699,7 +701,10 @@ static void vl53l0x_acquire_one_sample(void) {
 			(status == VL53L0X_ERROR_NONE && measurement.RangeStatus == 0U) ?
 					1U : 0U;
 
+	osMutexAcquire(tofDataMutexID, osWaitForever);
 	preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
+	osMutexRelease(tofDataMutexID);
+	printf("%u mm/n",g_raw_tof.range_mm );
 }
 
 static void calibrate_gyro_bias(void) {

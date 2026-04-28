@@ -28,6 +28,10 @@ extern osMutexId_t altitudeDataMutexID;
 extern processed_baro_sample_t g_processed_baro;
 extern osMutexId_t outputThrustDataMutexID;
 
+//Lidar
+extern osMutexId_t tofDataMutexID;
+extern processed_tof_sample_t g_processed_tof;
+
 void writeToMotors(motor_outputs_t* motors) {
     if (motors->fr > 100)
         motors->fr = 100;
@@ -197,21 +201,27 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 
 void Altitude_RunControlLoop(Altitude_PID_State_t *state) {
 	//get current altitude
-	osMutexAcquire(altitudeDataMutexID, MUTEX_TIMEOUT);
-	processed_baro_sample_t currentBarometerReading = g_processed_baro;
-	osMutexRelease(altitudeDataMutexID);
+	// osMutexAcquire(altitudeDataMutexID, MUTEX_TIMEOUT);
+	// processed_baro_sample_t currentBarometerReading = g_processed_baro;
+	// osMutexRelease(altitudeDataMutexID);
 
-	state->currentAltitude = currentBarometerReading.altitude_m;
+	//Replacing baro with Lidar?
+    osMutexAcquire(tofDataMutexID, MUTEX_TIMEOUT);
+    processed_tof_sample_t currentTof = g_processed_tof;
+    osMutexRelease(tofDataMutexID);
+
+	//state->currentAltitude = currentBarometerReading.altitude_m;
+	state->currentAltitude = currentTof.range_m;
 
 	float dt;
 	if (state->isFirstRun) {
 		dt = 0.01f; // Default 100Hz
-		state->lastBaroTimestampUs = currentBarometerReading.timestamp_us;
+		state->lastBaroTimestampUs = currentTof.timestamp_us;//currentBarometerReading.timestamp_us;
 		state->isFirstRun = false;
 	} else {
-		dt = (float) (currentBarometerReading.timestamp_us
+		dt = (float) (/*currentBarometerReading.timestamp_us*/ currentTof.timestamp_us
 				- state->lastBaroTimestampUs) / 1000000.0f;
-		state->lastBaroTimestampUs = currentBarometerReading.timestamp_us;
+		state->lastBaroTimestampUs = currentTof.timestamp_us; //currentBarometerReading.timestamp_us;
 	}
 
 	if (dt <= 0.0f || dt > 0.1f)

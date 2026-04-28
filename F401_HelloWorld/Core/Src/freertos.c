@@ -33,13 +33,14 @@
 #include "app_bluenrg_ms.h"
 #include <stdbool.h>
 #include "rtos_flags.h"
+#include <VL53L0X_def.h>
 
 #define ALTITUDE_OFFSET_M (1)
 
 extern TIM_HandleTypeDef htim4;
 extern processed_imu_sample_t g_processed_imu;
 extern processed_baro_sample_t g_processed_baro;
-volatile bool armMotors = true;
+volatile bool armMotors = false;
 extern volatile motor_outputs_t g_motor_outputs;
 const motor_outputs_t motor_zeros = {0};
 /* USER CODE END Includes */
@@ -53,6 +54,11 @@ osThreadId_t ledHeartbeatID;
 osThreadAttr_t imuAcquisitionTaskAttr = { .name = "imuAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536 };
 osThreadId_t imuAcquisitionTaskID;
+
+osThreadAttr_t tofAcquisitionTaskAttr = { .name = "tofAcquisition", .priority =
+		osPriorityRealtime, .stack_size = 1536 };
+osThreadId_t tofAcquisitionTaskID;
+
 
 osThreadAttr_t RPYTaskAttr = { .name = "rpyPIDTask", .priority =
 		osPriorityRealtime, .stack_size = 1024 }; //needed?
@@ -83,6 +89,13 @@ const osMutexAttr_t altitudeDataMutexAttr = { "altitudeDataMutex", // human read
 		0U                                        // size for control block
 		};
 osMutexId_t altitudeDataMutexID;
+
+const osMutexAttr_t tofDataMutexAttr = { "tofDataMutex",
+    osMutexRecursive | osMutexPrioInherit,
+	 NULL,
+	 0U 
+	};
+osMutexId_t tofDataMutexID;
 
 const osMutexAttr_t outputThrustDataMutexAttr = { "outputThrustDataMutex", // human readable mutex name
 		osMutexRecursive | osMutexPrioInherit,    // attr_bits
@@ -134,6 +147,7 @@ void applicationInit(void);
 void ledHeartbeatTask(void *argument);
 void uartCommTask(void *argument);
 void IMUAcquisitionTask(void *argument);
+void TOFAcquisitionTask(void *argument);
 void flightControlTask(void *argument);
 void RPY_PID_task(void *arguments);
 void altitude_PID_task(void *arguments);
@@ -207,6 +221,7 @@ void PrintFreeRTOSStats(void)
 void applicationInit(void) {
 
 	assert(SensorManager_Init() == 0);
+	assert(vl53l0x_api_init_device() == VL53L0X_ERROR_NONE);
 
 	// Primitive creation
 	bleEventFlags = osEventFlagsNew(NULL); //Create the event flag for BLE task
@@ -217,6 +232,9 @@ void applicationInit(void) {
 
 	altitudeDataMutexID = osMutexNew(&altitudeDataMutexAttr);
 	assert(altitudeDataMutexID != NULL);
+
+	tofDataMutexID = osMutexNew(&tofDataMutexAttr);
+	assert(tofDataMutexID != NULL);
 
 	outputThrustDataMutexID = osMutexNew(&outputThrustDataMutexAttr);
 	assert(outputThrustDataMutexID != NULL);
@@ -238,6 +256,10 @@ void applicationInit(void) {
 	imuAcquisitionTaskID = osThreadNew(IMUAcquisitionTask, NULL,
 			&imuAcquisitionTaskAttr);
 	assert(imuAcquisitionTaskID != 0);
+
+	tofAcquisitionTaskID = osThreadNew(TOFAcquisitionTask, NULL, 
+		    &tofAcquisitionTaskAttr);
+	assert(tofAcquisitionTaskID != 0);
 
 	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
 	assert(uartCommTaskID != 0);
@@ -297,11 +319,17 @@ void altitude_PID_task(void *arguments) {
 			.altitudeLastError = 0, .altDerivativeFiltered = 0,
 			.currentAltitude = 0, .lastBaroTimestampUs = 0, .isFirstRun = true };
 
+	// while (altitudePIDParams.setpoint <= ALTITUDE_OFFSET_M) {
+	// 	osMutexAcquire(altitudeDataMutexID, osWaitForever);
+	// 	altitudePIDParams.setpoint = g_processed_baro.altitude_m
+	// 			+ ALTITUDE_OFFSET_M;
+	// 	osMutexRelease(altitudeDataMutexID);
+	// }
+
 	while (altitudePIDParams.setpoint <= ALTITUDE_OFFSET_M) {
-		osMutexAcquire(altitudeDataMutexID, osWaitForever);
-		altitudePIDParams.setpoint = g_processed_baro.altitude_m
-				+ ALTITUDE_OFFSET_M;
-		osMutexRelease(altitudeDataMutexID);
+		osMutexAcquire(tofDataMutexID, osWaitForever);
+		altitudePIDParams.setpoint = g_processed_tof.range_m + ALTITUDE_OFFSET_M;
+        osMutexRelease(tofDataMutexID);
 	}
 
 	for (;;) {
@@ -349,6 +377,17 @@ void IMUAcquisitionTask(void *argument) {
 	}
 }
 
+void TOFAcquisitionTask(void *argument) {
+    (void) argument;
+
+    while (1) {
+        //int start = micros();
+        vl53l0x_acquire_one_sample();   
+       // int end = micros();
+       // int diff = end - start;
+        osDelay(33);
+    }
+}
 /*
  Approach 1:
  Since we will be asynchronously sending messages instead of checking the BLE message (polling) every 10msec or something using non-blocking stuff
