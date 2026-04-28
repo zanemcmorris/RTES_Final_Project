@@ -13,7 +13,7 @@ volatile motor_outputs_t g_motor_outputs = {0};
 // enjoy the terms!
 PID_params_t rollPIDParams = { 0.45, 0.15, 0.11, 0 };
 PID_params_t pitchPIDParams = { 0.25, 0.03, 0.09, 0 };
-PID_params_t yawPIDParams =  { 0.1, 0, 0, 0 };
+PID_params_t yawPIDParams =  { 0.5, 0.02, 0, 0 };
 PID_params_t altitudePIDParams =  { 0, 0, 0, 0 };
 
 #define BASE_THRUST (0.3f)
