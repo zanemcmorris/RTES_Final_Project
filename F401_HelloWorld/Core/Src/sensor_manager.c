@@ -858,8 +858,6 @@ void SensorManager_RunOnce(void) {
 
 	LSM6DSR_ACC_Get_DRDY_Status(&MotionSensor, &acc_ready);
 	LSM6DSR_GYRO_Get_DRDY_Status(&MotionSensor, &gyro_ready);
-	//check_imu_fifo_status();
-	//drain_imu_fifo_once();
 
 	if (acc_ready) {
 		g_acc_ready_count++;
@@ -923,9 +921,7 @@ void SensorManager_RunOnce(void) {
 	/* baro_overrun_send_line(); */
 	/* imu_fifo_send_line(); */
 
-	//endClock = DWT->CYCCNT;
-	//diffClock = endClock - startClock;
-	//diffClock *= 1.19e-5;
+
 
 
     uint32_t end_cycles = DWT->CYCCNT;

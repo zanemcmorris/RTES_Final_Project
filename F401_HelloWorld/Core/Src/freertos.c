@@ -255,8 +255,8 @@ void applicationInit(void) {
 	assert(SensorManager_Init() == 0);
 
 	// Primitive creation
-//	bleEventFlags = osEventFlagsNew(NULL); //Create the event flag for BLE task
-//	assert(bleEventFlags != NULL);
+	bleEventFlags = osEventFlagsNew(NULL); //Create the event flag for BLE task
+	assert(bleEventFlags != NULL);
 
 	IMUDataMutexID = osMutexNew(&IMUDataMutexAttr);
 	assert(IMUDataMutexID != NULL);
