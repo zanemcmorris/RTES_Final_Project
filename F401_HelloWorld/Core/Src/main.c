@@ -51,8 +51,9 @@ SPI_HandleTypeDef hspi2;
 DMA_HandleTypeDef hdma_spi2_rx;
 DMA_HandleTypeDef hdma_spi2_tx;
 
+//TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
-
 UART_HandleTypeDef huart1;
 
 /* Definitions for defaultTask */
@@ -70,7 +71,9 @@ static void MX_DMA_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C2_Init(void);
+static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
+
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -206,6 +209,7 @@ int main(void) {
 	MX_SPI2_Init();
 	MX_USART1_UART_Init();
 	MX_I2C2_Init();
+	MX_TIM2_Init();
 	MX_TIM4_Init();
 	//MX_BlueNRG_MS_Init();
 	/* USER CODE BEGIN 2 */
@@ -370,6 +374,61 @@ static void MX_SPI2_Init(void) {
 
 	/* USER CODE END SPI2_Init 2 */
 
+}
+
+//timer 2 inintilisation for os delay hardware timer replacement in imu aquistion task
+/**
+ * @brief TIM2 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_TIM2_Init(void) {
+
+    TIM_ClockConfigTypeDef sClockSourceConfig = { 0 };
+    TIM_MasterConfigTypeDef sMasterConfig = { 0 };
+
+    /*
+     * APB1 timer clock is 84 MHz in your project.
+     *
+     * Prescaler = 83 means:
+     * 84 MHz / (83 + 1) = 1 MHz
+     *
+     * Therefore, TIM2 counts once every 1 us.
+     */
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 83;
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+
+    /*
+     * Period = 2397 means timer update occurs after 2398 counts.
+     *
+     * 2398 counts * 1 us/count = 2398 us = 2.398 ms.
+     *
+     * This matches:
+     * 1000 ms / 417 Hz = 2.398 ms
+     */
+    htim2.Init.Period = 2397;
+
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+
+    if (HAL_TIM_Base_Init(&htim2) != HAL_OK) {
+        Error_Handler();
+    }
+
+    sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+
+    if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK) {
+        Error_Handler();
+    }
+
+    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+
+    if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig)
+            != HAL_OK) {
+        Error_Handler();
+    }
 }
 
 /**
@@ -565,13 +624,33 @@ void StartDefaultTask(void *argument) {
  * @param  htim : TIM handle
  * @retval None
  */
+//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+//	/* USER CODE BEGIN Callback 0 */
+//
+//	/* USER CODE END Callback 0 */
+//	if (htim->Instance == TIM3) {
+//		HAL_IncTick();
+//	}
+//	/* USER CODE BEGIN Callback 1 */
+//
+//	/* USER CODE END Callback 1 */
+//}
+
+extern void TIM2_IMU_PeriodElapsedCallback(void);
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	/* USER CODE BEGIN Callback 0 */
 
 	/* USER CODE END Callback 0 */
+
 	if (htim->Instance == TIM3) {
 		HAL_IncTick();
 	}
+
+	if (htim->Instance == TIM2) {
+		TIM2_IMU_PeriodElapsedCallback();
+	}
+
 	/* USER CODE BEGIN Callback 1 */
 
 	/* USER CODE END Callback 1 */

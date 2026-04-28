@@ -37,6 +37,8 @@
 
 #define ALTITUDE_OFFSET_M (1)
 
+//extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim4;
 extern processed_imu_sample_t g_processed_imu;
 extern processed_baro_sample_t g_processed_baro;
@@ -110,9 +112,11 @@ osMutexId_t outputThrustDataMutexID;
 osMutexId_t pidMutex;
 
 
+//osSemaphoreId_t RPYReleaseSemID;
+//osSemaphoreId_t altitudeReleaseSemID;
+osSemaphoreId_t IMUReleaseSemID;
 osSemaphoreId_t RPYReleaseSemID;
 osSemaphoreId_t altitudeReleaseSemID;
-
 osTimerId_t RPYTimer;
 static void RPYTimerCallback(void *argument) {
 	osSemaphoreRelease(RPYReleaseSemID);
@@ -121,6 +125,12 @@ static void RPYTimerCallback(void *argument) {
 osTimerId_t altitudeTimer;
 static void altitudeTimerCallback(void *argument) {
 	osSemaphoreRelease(altitudeReleaseSemID);
+}
+
+void TIM2_IMU_PeriodElapsedCallback(void) {
+    if (IMUReleaseSemID != NULL) {
+        osSemaphoreRelease(IMUReleaseSemID);
+    }
 }
 
 osEventFlagsId_t bleEventFlags;
@@ -293,6 +303,15 @@ void applicationInit(void) {
 	assert(pidMutex != NULL);
 
 
+//	RPYReleaseSemID = osSemaphoreNew(1, 1, NULL);
+//	assert(RPYReleaseSemID != NULL);
+//
+//	altitudeReleaseSemID = osSemaphoreNew(1, 1, NULL);
+//	assert(altitudeReleaseSemID != NULL);
+
+	IMUReleaseSemID = osSemaphoreNew(1, 0, NULL);
+	assert(IMUReleaseSemID != NULL);
+
 	RPYReleaseSemID = osSemaphoreNew(1, 1, NULL);
 	assert(RPYReleaseSemID != NULL);
 
@@ -336,6 +355,8 @@ void applicationInit(void) {
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
+
+	//HAL_TIM_Base_Start_IT(&htim2);
 
 }
 
@@ -416,16 +437,38 @@ void uartCommTask(void *argument) {
 	}
 }
 
+//void IMUAcquisitionTask(void *argument) {
+//	(void) argument;
+//
+//	while (1) {
+//
+//		//int start = micros();
+//		SensorManager_RunOnce();
+//		//int end = micros();
+//		//int diff = end - start;
+//		//osDelay(IMU_SAMPLING_PERIOD_MS);
+//		osSemaphoreAcquire(IMUReleaseSemID, osWaitForever);
+//	}
+//}
+
 void IMUAcquisitionTask(void *argument) {
 	(void) argument;
 
+	/*
+	 * Start TIM2 from inside the task so the FreeRTOS scheduler is already running
+	 * before TIM2 begins releasing the IMU semaphore from its interrupt callback.
+	 */
+	assert(HAL_TIM_Base_Start_IT(&htim2) == HAL_OK);
+
 	while (1) {
 
-		//int start = micros();
+		/*
+		 * TIM2 releases this semaphore every ~2398 us.
+		 * This gives hardware-timed IMU acquisition instead of osDelay().
+		 */
+		osSemaphoreAcquire(IMUReleaseSemID, osWaitForever);
+
 		SensorManager_RunOnce();
-		//int end = micros();
-		//int diff = end - start;
-		osDelay(IMU_SAMPLING_PERIOD_MS);
 	}
 }
 
