@@ -12,7 +12,7 @@ volatile motor_outputs_t g_motor_outputs = {0};
 
 // enjoy the terms!
 PID_params_t rollPIDParams = { 0.45, 0.15, 0.11, 0 };
-PID_params_t pitchPIDParams = { 0.40, 0.10, 0.13, 0 };
+PID_params_t pitchPIDParams = { 0.25, 0.03, 0.09, 0 };
 PID_params_t yawPIDParams =  { 0.1, 0, 0, 0 };
 PID_params_t altitudePIDParams =  { 0, 0, 0, 0 };
 
@@ -101,7 +101,7 @@ float duty_from_thrust(float thrust01)
 
 #define ENABLE_ROLL_CONTROL (1)
 #define ENABLE_PITCH_CONTROL (1)
-#define ENABLE_YAW_CONTROL (0)
+#define ENABLE_YAW_CONTROL (1)
 #define ENABLE_ALT_CONTROL (0)
 
 void RPY_RunControlLoop(RPY_PID_State_t *state) {
@@ -211,10 +211,10 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 
 	//motor mixing algo (MMA)
 	// TODO: Add these to BLE telemetry - motor values are in [0,1]
-	float motorFR = latestAltitude + yawOutput + pitchOutput + rollOutput;
-	float motorFL = latestAltitude - yawOutput + pitchOutput - rollOutput;
-	float motorBR = latestAltitude - yawOutput - pitchOutput + rollOutput;
-	float motorBL = latestAltitude + yawOutput - pitchOutput - rollOutput;
+	float motorFR = latestAltitude - yawOutput + pitchOutput + rollOutput;
+	float motorFL = latestAltitude + yawOutput + pitchOutput - rollOutput;
+	float motorBR = latestAltitude + yawOutput - pitchOutput + rollOutput;
+	float motorBL = latestAltitude - yawOutput - pitchOutput - rollOutput;
 
 	//cap output at 100% (?)
 	if (motorFR > 100)
