@@ -1,0 +1,4 @@
+Mini Drone Frame - GRacer One v5 PRO ^^ Update by GParts on Thingiverse: https://www.thingiverse.com/thing:2881631
+
+Summary:
+GParts GRacer One v5 PRO FINAL ;) (during the tests)Class: 110 Motor mount for RacerStar 8520 8.5x20mm (v5 clamp band)https://www.banggood.com/4X-Racerstar-8520-8_5x20mm-53500RPM-Coreless-Motor-for-Eachine-QX80-QX90-QX95-DIY-FPV-Quadcopter-p-1114280.htmlPropellers: ~1mm shaft (max length 65mm)https://www.banggood.com/10-Pairs-Kinkong-65mm-Blade-Propeller-Prop-20Pcs-for-720-8520-Coreless-Motor-DIY-Micro-Quadcopter-p-1092166.htmlBattery: 1s 600mah (best for flips), 1000-1200mah (max)(:

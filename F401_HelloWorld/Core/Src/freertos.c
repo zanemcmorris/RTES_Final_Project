@@ -43,6 +43,10 @@ extern processed_baro_sample_t g_processed_baro;
 volatile bool armMotors = false;
 extern volatile motor_outputs_t g_motor_outputs;
 const motor_outputs_t motor_zeros = {0};
+extern volatile uint32_t g_sensor_runonce_cycles_last;
+extern volatile uint32_t g_sensor_runonce_cycles_min;
+extern volatile uint32_t g_sensor_runonce_cycles_max;
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -310,8 +314,8 @@ void applicationInit(void) {
 	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
 	assert(uartCommTaskID != 0);
 
-//	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
-//	assert(bleCommTaskID != 0);
+	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
+	assert(bleCommTaskID != 0);
 
 	RPYTaskID = osThreadNew(RPY_PID_task, NULL, &RPYTaskAttr);
 	assert(RPYTaskID != 0);
@@ -353,6 +357,7 @@ void RPY_PID_task(void *arguments) {
 			writeToMotors(&g_motor_outputs);
 			int end = micros();
 			int diff = end - start;
+			diff -= diff; // remove unused warning
 		} else {
 			writeToMotors(&motor_zeros);
 		}
@@ -386,6 +391,7 @@ void altitude_PID_task(void *arguments) {
 		Altitude_RunControlLoop(&altPIDState);
 		int end = micros();
 		volatile int diff = end - start;
+		diff -= diff; //remove unused warning
 	}
 }
 

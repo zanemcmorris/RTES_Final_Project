@@ -76,6 +76,9 @@ void Error_Handler(void);
 #define VL53L0X_INT_Pin GPIO_PIN_1
 #define VL53L0X_INT_GPIO_Port GPIOA
 
+#define PI_OVER_2 (1.57079632679)
+#define PI_OVER_4 (0.78539816339)
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

@@ -381,27 +381,27 @@ int32_t vl53l0x_api_init_device(void)
     vl53l0x_setup_device_struct();
 
     status = VL53L0X_DataInit(&g_vl53l0x_dev);
-    if (status != VL53L0X_ERROR_NONE) 
+    if (status != VL53L0X_ERROR_NONE)
 	{
 		return status;
 	}
 
     status = VL53L0X_StaticInit(&g_vl53l0x_dev);
-    if (status != VL53L0X_ERROR_NONE) 
+    if (status != VL53L0X_ERROR_NONE)
 	{
 		return status;
 	}
 
     status = VL53L0X_PerformRefSpadManagement(&g_vl53l0x_dev,
              &ref_spad_count, &is_aperture_spads);
-    if (status != VL53L0X_ERROR_NONE) 
+    if (status != VL53L0X_ERROR_NONE)
 	{
 		return status;
 	}
 
     status = VL53L0X_PerformRefCalibration(&g_vl53l0x_dev,
              &vhv_settings, &phase_cal);
-    if (status != VL53L0X_ERROR_NONE) 
+    if (status != VL53L0X_ERROR_NONE)
 	{
 		return status;
 	}
@@ -409,7 +409,7 @@ int32_t vl53l0x_api_init_device(void)
     // changing to continuous mode
     status = VL53L0X_SetDeviceMode(&g_vl53l0x_dev,
              VL53L0X_DEVICEMODE_CONTINUOUS_RANGING);
-    if (status != VL53L0X_ERROR_NONE) 
+    if (status != VL53L0X_ERROR_NONE)
 	{
 		return status;
 	}
@@ -497,6 +497,15 @@ static void preprocess_tof_sample(const raw_tof_sample_t *raw,
 	proc->range_status = raw->range_status;
 	proc->valid = raw->valid;
 	proc->range_m = raw->range_mm / 1000.0f;
+
+	osMutexAcquire(IMUDataMutexID, osWaitForever);
+	proc->range_m = proc->range_m * cosf(g_processed_imu.combined_pitch) * cosf(g_processed_imu.combined_roll);
+	if(fabs(g_processed_imu.combined_pitch) > PI_OVER_4 || g_processed_imu.combined_roll > PI_OVER_4){
+		proc->valid = false;
+	}
+	osMutexRelease(IMUDataMutexID);
+
+
 }
 
 static void imu_uart_send_raw_line(const LSM6DSR_Axes_t *accel_raw,
