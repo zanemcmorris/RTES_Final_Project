@@ -401,15 +401,6 @@ static void MX_TIM2_Init(void) {
     htim2.Instance = TIM2;
     htim2.Init.Prescaler = 83;
     htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-
-    /*
-     * Period = 2397 means timer update occurs after 2398 counts.
-     *
-     * 2398 counts * 1 us/count = 2398 us = 2.398 ms.
-     *
-     * This matches:
-     * 1000 ms / 417 Hz = 2.398 ms
-     */
     htim2.Init.Period = 1000*IMU_SAMPLING_PERIOD_MS;
 
     htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
