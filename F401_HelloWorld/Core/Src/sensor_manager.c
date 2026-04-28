@@ -60,6 +60,10 @@ static uint32_t g_imu_fifo_drained_samples = 0;
 static raw_tof_sample_t g_raw_tof = { 0 };
 static processed_tof_sample_t g_processed_tof = { 0 };
 
+volatile uint32_t g_sensor_runonce_cycles_last = 0;
+volatile uint32_t g_sensor_runonce_cycles_max = 0;
+volatile uint32_t g_sensor_runonce_cycles_min = 0xFFFFFFFFU;
+
 static uint32_t micros(void) {
 	return (uint32_t) ((HAL_GetTick() * 1000U)
 			+ ((SysTick->LOAD - SysTick->VAL) * 1000U) / (SysTick->LOAD + 1U));
@@ -291,7 +295,7 @@ int32_t MX_LSM6DSR_Init(void) {
 	return LSM6DSR_OK;
 }
 
-static int32_t MX_LSM6DSR_FIFO_Test_Init(void) {
+/*static int32_t MX_LSM6DSR_FIFO_Test_Init(void) {
 	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
 			LSM6DSR_BYPASS_MODE) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
@@ -306,6 +310,22 @@ static int32_t MX_LSM6DSR_FIFO_Test_Init(void) {
 
 	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
 			LSM6DSR_STREAM_MODE) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
+
+	return LSM6DSR_OK;
+}*/
+
+static int32_t MX_LSM6DSR_FIFO_Test_Init(void) {
+	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
+			LSM6DSR_BYPASS_MODE) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
+
+	if (lsm6dsr_fifo_xl_batch_set(&(MotionSensor.Ctx),
+			LSM6DSR_XL_NOT_BATCHED) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
+
+	if (lsm6dsr_fifo_gy_batch_set(&(MotionSensor.Ctx),
+			LSM6DSR_GY_NOT_BATCHED) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
 	return LSM6DSR_OK;
@@ -830,16 +850,16 @@ void SensorManager_RunOnce(void) {
 	uint8_t press_ready = 0;
 	uint8_t temp_ready = 0;
 
-	uint32_t startClock = 0, endClock = 0, diffClock = 0;
+	//uint32_t startClock = 0, endClock = 0, diffClock = 0;
 
-	startClock = DWT->CYCCNT;
+	uint32_t start_cycles = DWT->CYCCNT;
 
 	g_imu_task_loops++;
 
 	LSM6DSR_ACC_Get_DRDY_Status(&MotionSensor, &acc_ready);
 	LSM6DSR_GYRO_Get_DRDY_Status(&MotionSensor, &gyro_ready);
-	check_imu_fifo_status();
-	drain_imu_fifo_once();
+	//check_imu_fifo_status();
+	//drain_imu_fifo_once();
 
 	if (acc_ready) {
 		g_acc_ready_count++;
@@ -903,9 +923,23 @@ void SensorManager_RunOnce(void) {
 	/* baro_overrun_send_line(); */
 	/* imu_fifo_send_line(); */
 
-	endClock = DWT->CYCCNT;
-	diffClock = endClock - startClock;
-	diffClock *= 1.19e-5;
+	//endClock = DWT->CYCCNT;
+	//diffClock = endClock - startClock;
+	//diffClock *= 1.19e-5;
+
+
+    uint32_t end_cycles = DWT->CYCCNT;
+    uint32_t diff_cycles = end_cycles - start_cycles;
+
+    g_sensor_runonce_cycles_last = diff_cycles;
+
+    if (diff_cycles > g_sensor_runonce_cycles_max) {
+        g_sensor_runonce_cycles_max = diff_cycles;
+    }
+
+    if (diff_cycles < g_sensor_runonce_cycles_min) {
+        g_sensor_runonce_cycles_min = diff_cycles;
+    }
 
 	/* Keep these unused helper references in file so compiler does not warn if needed later */
 	(void) g_debug_output_mode;

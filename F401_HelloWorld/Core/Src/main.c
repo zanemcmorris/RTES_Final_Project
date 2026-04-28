@@ -207,7 +207,7 @@ int main(void) {
 	MX_USART1_UART_Init();
 	MX_I2C2_Init();
 	MX_TIM4_Init();
-	MX_BlueNRG_MS_Init();
+	//MX_BlueNRG_MS_Init();
 	/* USER CODE BEGIN 2 */
 	MX_PA8_CS_Init();
 	MX_PC13_CS_Init();
@@ -358,7 +358,7 @@ static void MX_SPI2_Init(void) {
 	hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
 	hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
 	hspi2.Init.NSS = SPI_NSS_SOFT;
-	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
 	hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
 	hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
 	hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
