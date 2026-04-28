@@ -32,6 +32,10 @@ extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
 extern I2C_HandleTypeDef hi2c2;
 
+extern volatile uint32_t g_sensor_runonce_cycles_last;
+extern volatile uint32_t g_sensor_runonce_cycles_max;
+extern volatile uint32_t g_sensor_runonce_cycles_min;
+
 typedef struct
 {
     SPI_HandleTypeDef *hspi;
