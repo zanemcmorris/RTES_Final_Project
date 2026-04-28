@@ -670,7 +670,7 @@ static void vl53l0x_acquire_one_sample(void) {
 }
 
 static void calibrate_gyro_bias(void) {
-	const uint32_t num_samples = 50;
+	const uint32_t num_samples = 200;
 	uint32_t collected = 0;
 
 	int64_t sum_x = 0;
@@ -782,6 +782,8 @@ int32_t SensorManager_Init(void) {
 	g_gyro_ready_count = 0;
 	g_acc_read_count = 0;
 	g_gyro_read_count = 0;
+
+	HAL_Delay(1000);
 
 	return 0;
 }

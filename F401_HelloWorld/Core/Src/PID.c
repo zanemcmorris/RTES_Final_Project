@@ -8,10 +8,10 @@
 #include "PID.h"
 
 // enjoy the terms!
-static PID_params_t rollPIDParams = { .70, 0.33, 0.08, 0 }; // was .25,.05,.005
-static PID_params_t pitchPIDParams = { .70, 0.33, 0.08, 0 };
-static PID_params_t yawPIDParams = { .1, .05, .01, 0 };
-PID_params_t altitudePIDParams = { .1, 0, 0, 0 };
+static PID_params_t rollPIDParams = { 0.45, 0.15, 0.11, 0 }; // was .25,.05,.005
+static PID_params_t pitchPIDParams = { 0.40, 0.10, 0.13, 0 };
+static PID_params_t yawPIDParams = { 0.1, 0, 0, 0 };
+PID_params_t altitudePIDParams = { 0, 0, 0, 0 };
 
 static float globalAltitudeOuput; //needed? static
 // Filter coefficient for the D-term (0.0 to 1.0)
@@ -56,9 +56,9 @@ void writeToMotors(float motorFR, float motorFL, float motorBR, float motorBL) {
 	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, flSetting);
 }
 
-#define ENABLE_ROLL_CONTROL (0)
-#define ENABLE_PITCH_CONTROL (0)
-#define ENABLE_YAW_CONTROL (1 )
+#define ENABLE_ROLL_CONTROL (1)
+#define ENABLE_PITCH_CONTROL (1)
+#define ENABLE_YAW_CONTROL (1)
 #define ENABLE_ALT_CONTROL (0)
 
 void RPY_RunControlLoop(RPY_PID_State_t *state) {
@@ -163,15 +163,15 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 #if ENABLE_ALT_CONTROL
 	float latestAltitude = globalAltitudeOuput;
 #else
-	float latestAltitude = 0; // Math says ~70% is hovering
+	float latestAltitude = 0.3; // Math says ~70% is hovering
 #endif
 
 	//motor mixing algo (MMA)
 	// TODO: Add these to BLE telemetry - motor values are in [0,1]
-	float motorFR = latestAltitude + yawOutput + pitchOutput + rollOutput;
-	float motorFL = latestAltitude - yawOutput + pitchOutput - rollOutput;
-	float motorBR = latestAltitude - yawOutput - pitchOutput + rollOutput;
-	float motorBL = latestAltitude + yawOutput - pitchOutput - rollOutput;
+	float motorFR = latestAltitude - yawOutput + pitchOutput + rollOutput;
+	float motorFL = latestAltitude + yawOutput + pitchOutput - rollOutput;
+	float motorBR = latestAltitude + yawOutput - pitchOutput + rollOutput;
+	float motorBL = latestAltitude - yawOutput - pitchOutput - rollOutput;
 
 	//cap output at 100% (?)
 	if (motorFR > 100)

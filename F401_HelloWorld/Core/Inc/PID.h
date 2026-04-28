@@ -36,8 +36,8 @@
 #define FILTER_ALPHA 0.98f
 
 //tuning: start at 5, then
-#define ROLL_MAX_I 10.0f //assuming motor output of 0-100, 10-15
-#define PITCH_MAX_I 10.0f
+#define ROLL_MAX_I 2.0f //assuming motor output of 0-100, 10-15
+#define PITCH_MAX_I 2.0f
 #define YAW_MAX_I 20.0f //20-25
 #define ALT_MAX_I 10.0f
 
