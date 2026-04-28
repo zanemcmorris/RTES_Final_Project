@@ -350,42 +350,53 @@ int32_t MX_LPS22HH_Init(void) {
 
 	return LPS22HH_OK;
 }
+int32_t vl53l0x_api_init_device(void)
+{
+    VL53L0X_Error status;
+    uint8_t vhv_settings = 0;
+    uint8_t phase_cal = 0;
+    uint32_t ref_spad_count = 0;
+    uint8_t is_aperture_spads = 0;
 
-//00msec - as per datasheet
-int32_t vl53l0x_api_init_device(void) {
-	VL53L0X_Error status;
-	uint8_t vhv_settings = 0;
-	uint8_t phase_cal = 0;
-	uint32_t ref_spad_count = 0;
-	uint8_t is_aperture_spads = 0;
+    vl53l0x_setup_device_struct();
 
-	vl53l0x_setup_device_struct();
-
-	status = VL53L0X_DataInit(&g_vl53l0x_dev);
-	if (status != VL53L0X_ERROR_NONE) {
+    status = VL53L0X_DataInit(&g_vl53l0x_dev);
+    if (status != VL53L0X_ERROR_NONE) 
+	{
 		return status;
 	}
 
-	status = VL53L0X_StaticInit(&g_vl53l0x_dev);
-	if (status != VL53L0X_ERROR_NONE) {
+    status = VL53L0X_StaticInit(&g_vl53l0x_dev);
+    if (status != VL53L0X_ERROR_NONE) 
+	{
 		return status;
 	}
 
-	status = VL53L0X_PerformRefSpadManagement(&g_vl53l0x_dev, &ref_spad_count,
-			&is_aperture_spads);
-	if (status != VL53L0X_ERROR_NONE) {
+    status = VL53L0X_PerformRefSpadManagement(&g_vl53l0x_dev,
+             &ref_spad_count, &is_aperture_spads);
+    if (status != VL53L0X_ERROR_NONE) 
+	{
 		return status;
 	}
 
-	status = VL53L0X_PerformRefCalibration(&g_vl53l0x_dev, &vhv_settings,
-			&phase_cal);
-	if (status != VL53L0X_ERROR_NONE) {
+    status = VL53L0X_PerformRefCalibration(&g_vl53l0x_dev,
+             &vhv_settings, &phase_cal);
+    if (status != VL53L0X_ERROR_NONE) 
+	{
 		return status;
 	}
 
-	status = VL53L0X_SetDeviceMode(&g_vl53l0x_dev,
-	VL53L0X_DEVICEMODE_SINGLE_RANGING);
-	return status;
+    // changing to continuous mode
+    status = VL53L0X_SetDeviceMode(&g_vl53l0x_dev,
+             VL53L0X_DEVICEMODE_CONTINUOUS_RANGING);
+    if (status != VL53L0X_ERROR_NONE) 
+	{
+		return status;
+	}
+
+    // Starting continuous measurement
+    status = VL53L0X_StartMeasurement(&g_vl53l0x_dev);
+    return status;
 }
 
 static void preprocess_imu_sample(const raw_imu_sample_t *raw,
@@ -676,36 +687,72 @@ static void vl53l0x_single_range_test(void) {
 	vl53l0x_uart_send_line(msg);
 }
 
-void vl53l0x_acquire_one_sample(void) {
-	VL53L0X_Error status;
-	VL53L0X_RangingMeasurementData_t measurement;
+void vl53l0x_acquire_one_sample(void)
+{
+    VL53L0X_Error status;
+    VL53L0X_RangingMeasurementData_t measurement;
+    uint8_t data_ready = 0;
+    uint32_t timeout_start = HAL_GetTick();
 
-	// status = vl53l0x_api_init_device();
-	// if (status != VL53L0X_ERROR_NONE) {
-	// 	g_raw_tof.timestamp_us = micros();
-	// 	g_raw_tof.range_mm = 0;
-	// 	g_raw_tof.range_status = (uint8_t) status;
-	// 	g_raw_tof.valid = 0;
+    // Wait till ready
+    do {
+        status = VL53L0X_GetMeasurementDataReady(&g_vl53l0x_dev, &data_ready);
+        if (status != VL53L0X_ERROR_NONE) break;
+		//Time out if it exceeds 100msec
+        if ((HAL_GetTick() - timeout_start) > 100) {
+            g_raw_tof.valid = 0;
+            return;
+        }
+    } while (data_ready == 0);
 
-	// 	preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
-	// 	return;
-	// }
+    status = VL53L0X_GetRangingMeasurementData(&g_vl53l0x_dev, &measurement);
 
-	status = VL53L0X_PerformSingleRangingMeasurement(&g_vl53l0x_dev,
-			&measurement);
+    VL53L0X_ClearInterruptMask(&g_vl53l0x_dev, 0);
 
-	g_raw_tof.timestamp_us = micros();
-	g_raw_tof.range_mm = measurement.RangeMilliMeter;
-	g_raw_tof.range_status = measurement.RangeStatus;
-	g_raw_tof.valid =
-			(status == VL53L0X_ERROR_NONE && measurement.RangeStatus == 0U) ?
-					1U : 0U;
+    g_raw_tof.timestamp_us = micros();
+    g_raw_tof.range_mm     = measurement.RangeMilliMeter;
+    g_raw_tof.range_status = measurement.RangeStatus;
+    g_raw_tof.valid        = (status == VL53L0X_ERROR_NONE &&
+                               measurement.RangeStatus == 0U) ? 1U : 0U;
 
-	osMutexAcquire(tofDataMutexID, osWaitForever);
-	preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
-	osMutexRelease(tofDataMutexID);
-	printf("%u mm/n",g_raw_tof.range_mm );
+    osMutexAcquire(tofDataMutexID, osWaitForever);
+    preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
+    osMutexRelease(tofDataMutexID);
+
+   // printf("TOF: %u mm valid=%u\r\n", g_raw_tof.range_mm, g_raw_tof.valid);
 }
+
+//Removing because it is for single mode
+// void vl53l0x_acquire_one_sample(void) {
+// 	VL53L0X_Error status;
+// 	VL53L0X_RangingMeasurementData_t measurement;
+
+// 	// status = vl53l0x_api_init_device();
+// 	// if (status != VL53L0X_ERROR_NONE) {
+// 	// 	g_raw_tof.timestamp_us = micros();
+// 	// 	g_raw_tof.range_mm = 0;
+// 	// 	g_raw_tof.range_status = (uint8_t) status;
+// 	// 	g_raw_tof.valid = 0;
+
+// 	// 	preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
+// 	// 	return;
+// 	// }
+
+// 	status = VL53L0X_PerformSingleRangingMeasurement(&g_vl53l0x_dev,
+// 			&measurement);
+
+// 	g_raw_tof.timestamp_us = micros();
+// 	g_raw_tof.range_mm = measurement.RangeMilliMeter;
+// 	g_raw_tof.range_status = measurement.RangeStatus;
+// 	g_raw_tof.valid =
+// 			(status == VL53L0X_ERROR_NONE && measurement.RangeStatus == 0U) ?
+// 					1U : 0U;
+
+// 	osMutexAcquire(tofDataMutexID, osWaitForever);
+// 	preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
+// 	osMutexRelease(tofDataMutexID);
+// 	printf("%u mm/n",g_raw_tof.range_mm );
+// }
 
 static void calibrate_gyro_bias(void) {
 	const uint32_t num_samples = 150;
