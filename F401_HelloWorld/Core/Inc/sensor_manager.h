@@ -148,6 +148,7 @@ int32_t MX_LPS22HH_Init(void);
 int32_t vl53l0x_api_init_device(void);
 void vl53l0x_cfg_INT(void);
 void vl53l0x_start_next_measurement(void);
+void vl53l0x_acquire_one_sample(void);
 
 
 #ifdef __cplusplus

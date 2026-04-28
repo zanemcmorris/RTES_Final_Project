@@ -37,12 +37,18 @@
 
 #define ALTITUDE_OFFSET_M (1)
 
+//extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim4;
 extern processed_imu_sample_t g_processed_imu;
 extern processed_baro_sample_t g_processed_baro;
 volatile bool armMotors = false;
 extern volatile motor_outputs_t g_motor_outputs;
 const motor_outputs_t motor_zeros = {0};
+extern volatile uint32_t g_sensor_runonce_cycles_last;
+extern volatile uint32_t g_sensor_runonce_cycles_min;
+extern volatile uint32_t g_sensor_runonce_cycles_max;
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -106,9 +112,11 @@ osMutexId_t outputThrustDataMutexID;
 osMutexId_t pidMutex;
 
 
+//osSemaphoreId_t RPYReleaseSemID;
+//osSemaphoreId_t altitudeReleaseSemID;
+osSemaphoreId_t IMUReleaseSemID;
 osSemaphoreId_t RPYReleaseSemID;
 osSemaphoreId_t altitudeReleaseSemID;
-
 osTimerId_t RPYTimer;
 static void RPYTimerCallback(void *argument) {
 	osSemaphoreRelease(RPYReleaseSemID);
@@ -117,6 +125,12 @@ static void RPYTimerCallback(void *argument) {
 osTimerId_t altitudeTimer;
 static void altitudeTimerCallback(void *argument) {
 	osSemaphoreRelease(altitudeReleaseSemID);
+}
+
+void TIM2_IMU_PeriodElapsedCallback(void) {
+    if (IMUReleaseSemID != NULL) {
+        osSemaphoreRelease(IMUReleaseSemID);
+    }
 }
 
 osEventFlagsId_t bleEventFlags;
@@ -289,6 +303,15 @@ void applicationInit(void) {
 	assert(pidMutex != NULL);
 
 
+//	RPYReleaseSemID = osSemaphoreNew(1, 1, NULL);
+//	assert(RPYReleaseSemID != NULL);
+//
+//	altitudeReleaseSemID = osSemaphoreNew(1, 1, NULL);
+//	assert(altitudeReleaseSemID != NULL);
+
+	IMUReleaseSemID = osSemaphoreNew(1, 0, NULL);
+	assert(IMUReleaseSemID != NULL);
+
 	RPYReleaseSemID = osSemaphoreNew(1, 1, NULL);
 	assert(RPYReleaseSemID != NULL);
 
@@ -310,8 +333,8 @@ void applicationInit(void) {
 	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
 	assert(uartCommTaskID != 0);
 
-//	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
-//	assert(bleCommTaskID != 0);
+	bleCommTaskID = osThreadNew(bluetoothControlTask, NULL, &bleCommTaskAttr);
+	assert(bleCommTaskID != 0);
 
 	RPYTaskID = osThreadNew(RPY_PID_task, NULL, &RPYTaskAttr);
 	assert(RPYTaskID != 0);
@@ -333,6 +356,8 @@ void applicationInit(void) {
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
 
+	//HAL_TIM_Base_Start_IT(&htim2);
+
 }
 
 void RPY_PID_task(void *arguments) {
@@ -353,6 +378,7 @@ void RPY_PID_task(void *arguments) {
 			writeToMotors(&g_motor_outputs);
 			int end = micros();
 			int diff = end - start;
+			diff -= diff; // remove unused warning
 		} else {
 			writeToMotors(&motor_zeros);
 		}
@@ -386,6 +412,7 @@ void altitude_PID_task(void *arguments) {
 		Altitude_RunControlLoop(&altPIDState);
 		int end = micros();
 		volatile int diff = end - start;
+		diff -= diff; //remove unused warning
 	}
 }
 
@@ -410,16 +437,38 @@ void uartCommTask(void *argument) {
 	}
 }
 
+//void IMUAcquisitionTask(void *argument) {
+//	(void) argument;
+//
+//	while (1) {
+//
+//		//int start = micros();
+//		SensorManager_RunOnce();
+//		//int end = micros();
+//		//int diff = end - start;
+//		//osDelay(IMU_SAMPLING_PERIOD_MS);
+//		osSemaphoreAcquire(IMUReleaseSemID, osWaitForever);
+//	}
+//}
+
 void IMUAcquisitionTask(void *argument) {
 	(void) argument;
 
+	/*
+	 * Start TIM2 from inside the task so the FreeRTOS scheduler is already running
+	 * before TIM2 begins releasing the IMU semaphore from its interrupt callback.
+	 */
+	assert(HAL_TIM_Base_Start_IT(&htim2) == HAL_OK);
+
 	while (1) {
 
-		//int start = micros();
+		/*
+		 * TIM2 releases this semaphore every ~2398 us.
+		 * This gives hardware-timed IMU acquisition instead of osDelay().
+		 */
+		osSemaphoreAcquire(IMUReleaseSemID, osWaitForever);
+
 		SensorManager_RunOnce();
-		//int end = micros();
-		//int diff = end - start;
-		osDelay(IMU_SAMPLING_PERIOD_MS);
 	}
 }
 
