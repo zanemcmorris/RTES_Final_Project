@@ -68,6 +68,7 @@ void hci_tl_lowlevel_init(void);
  * @retval None
  */
 void hci_tl_lowlevel_isr(void);
+int32_t IsDataAvailable(void);
 
 #ifdef __cplusplus
 }

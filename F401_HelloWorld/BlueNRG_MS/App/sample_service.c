@@ -242,14 +242,16 @@ void receiveData(uint8_t *data_buffer, uint8_t Nb_bytes) {
  * @param  Nb_bytes : number of bytes to send
  * @retval None
  */
-void sendData(uint8_t *data_buffer, uint8_t Nb_bytes) {
+tBleStatus sendData(uint8_t *data_buffer, uint8_t Nb_bytes) {
+	tBleStatus ret = BLE_STATUS_ERROR;
 	if (BLE_Role == SERVER) {
-		aci_gatt_update_char_value(sampleServHandle, TXCharHandle, 0, Nb_bytes,
+		ret = aci_gatt_update_char_value(sampleServHandle, TXCharHandle, 0, Nb_bytes,
 				data_buffer);
 	} else {
-		aci_gatt_write_without_response(connection_handle, rx_handle + 1,
+		ret = aci_gatt_write_without_response(connection_handle, rx_handle + 1,
 				Nb_bytes, data_buffer);
 	}
+	return ret;
 }
 
 /**

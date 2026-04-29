@@ -30,6 +30,7 @@
 
 #include <string.h>
 #include "PID.h"
+#include "sensor_manager.h"
 
 extern volatile motor_outputs_t g_motor_outputs;
 
@@ -49,8 +50,7 @@ typedef struct {
 #include "sensor_manager.h"
 extern volatile processed_imu_sample_t g_processed_imu;
 extern volatile processed_baro_sample_t g_processed_baro;
-
-/* USER CODE END Includes */
+extern processed_tof_sample_t g_processed_tof;
 
 /* Private defines -----------------------------------------------------------*/
 /**
@@ -234,10 +234,12 @@ void MX_BlueNRG_MS_Process(void)
 {
   /* USER CODE BEGIN BlueNRG_MS_Process_PreTreatment */
   User_Process();
+  taskENTER_CRITICAL();
   hci_user_evt_proc();
+  taskEXIT_CRITICAL();
   /* USER CODE END BlueNRG_MS_Process_PreTreatment */
 
-
+  tBleStatus ble_ret;
 
 
   /* USER CODE BEGIN BlueNRG_MS_Process_PostTreatment */
@@ -255,68 +257,91 @@ void MX_BlueNRG_MS_Process(void)
             uint8_t  buf[19];
             uint16_t ts = (uint16_t)(now_ms & 0xFFFFU);
  
+            float f0, f1, f2, f3;
             switch (pkt_toggle)
             {
                 // Packet A : accel (g) + barometric pressure (hPa)
                 case 0:
                 {
+                    f0 = g_processed_imu.accel_x_g;
+                    f1 = g_processed_imu.accel_y_g;
+                    f2 = g_processed_imu.accel_z_g;
+                    f3 = g_processed_baro.pressure_hpa;
                     buf[0] = 0x41U;
-                    memcpy(buf +  1, &ts,                             sizeof(uint16_t));
-                    memcpy(buf +  3, &g_processed_imu.accel_x_g,      sizeof(float));
-                    memcpy(buf +  7, &g_processed_imu.accel_y_g,      sizeof(float));
-                    memcpy(buf + 11, &g_processed_imu.accel_z_g,      sizeof(float));
-                    memcpy(buf + 15, &g_processed_baro.pressure_hpa,  sizeof(float));
-                    sendData(buf, 19U);
+                    memcpy(buf +  1, &ts, sizeof(uint16_t));
+                    memcpy(buf +  3, &f0, sizeof(float));
+                    memcpy(buf +  7, &f1, sizeof(float));
+                    memcpy(buf + 11, &f2, sizeof(float));
+                    memcpy(buf + 15, &f3, sizeof(float));
+                    ble_ret = sendData(buf, 19U);
                     break;
                 }
  
                 //Packet B : gyro (dps) + integrated yaw (rad)
                 case 1:
                 {
+                    f0 = g_processed_imu.gyro_x_dps;
+                    f1 = g_processed_imu.gyro_y_dps;
+                    f2 = g_processed_imu.gyro_z_dps;
+                    f3 = g_processed_imu.gyro_z_rad_abs;
                     buf[0] = 0x42U;
-                    memcpy(buf +  1, &ts,                               sizeof(uint16_t));
-                    memcpy(buf +  3, &g_processed_imu.gyro_x_dps,       sizeof(float));
-                    memcpy(buf +  7, &g_processed_imu.gyro_y_dps,       sizeof(float));
-                    memcpy(buf + 11, &g_processed_imu.gyro_z_dps,       sizeof(float));
-                    memcpy(buf + 15, &g_processed_imu.gyro_z_rad_abs,   sizeof(float));
-                    sendData(buf, 19U);
+                    memcpy(buf +  1, &ts, sizeof(uint16_t));
+                    memcpy(buf +  3, &f0, sizeof(float));
+                    memcpy(buf +  7, &f1, sizeof(float));
+                    memcpy(buf + 11, &f2, sizeof(float));
+                    memcpy(buf + 15, &f3, sizeof(float));
+                    ble_ret = sendData(buf, 19U);
                     break;
                 }
  
                 //Packet C : FC velocity (m/s) + vertical position (m)
                 case 2:
                 {
+                    f0 = g_processed_imu.vel_x_mps;
+                    f1 = g_processed_imu.vel_y_mps;
+                    f2 = g_processed_imu.vel_z_mps;
+                    f3 = g_processed_imu.pos_z_m;
                     buf[0] = 0x43U;
-                    memcpy(buf +  1, &ts,                             sizeof(uint16_t));
-                    memcpy(buf +  3, &g_processed_imu.vel_x_mps,      sizeof(float));
-                    memcpy(buf +  7, &g_processed_imu.vel_y_mps,      sizeof(float));
-                    memcpy(buf + 11, &g_processed_imu.vel_z_mps,      sizeof(float));
-                    memcpy(buf + 15, &g_processed_imu.pos_z_m,        sizeof(float));
-                    sendData(buf, 19U);
+                    memcpy(buf +  1, &ts, sizeof(uint16_t));
+                    memcpy(buf +  3, &f0, sizeof(float));
+                    memcpy(buf +  7, &f1, sizeof(float));
+                    memcpy(buf + 11, &f2, sizeof(float));
+                    memcpy(buf + 15, &f3, sizeof(float));
+                    ble_ret = sendData(buf, 19U);
                     break;
                 }
  
                 //Packet D : motor setpoints (0.0 – 1.0)
                 case 3:
                 {
+                    f0 = g_motor_outputs.fr;
+                    f1 = g_motor_outputs.fl;
+                    f2 = g_motor_outputs.br;
+                    f3 = g_motor_outputs.bl;
                     buf[0] = 0x44U;
-                    memcpy(buf +  1, &ts,                   sizeof(uint16_t));
-                    memcpy(buf +  3, &g_motor_outputs.fr,   sizeof(float));
-                    memcpy(buf +  7, &g_motor_outputs.fl,   sizeof(float));
-                    memcpy(buf + 11, &g_motor_outputs.br,   sizeof(float));
-                    memcpy(buf + 15, &g_motor_outputs.bl,   sizeof(float));
-                    sendData(buf, 19U);
+                    memcpy(buf +  1, &ts, sizeof(uint16_t));
+                    memcpy(buf +  3, &f0, sizeof(float));
+                    memcpy(buf +  7, &f1, sizeof(float));
+                    memcpy(buf + 11, &f2, sizeof(float));
+                    memcpy(buf + 15, &f3, sizeof(float));
+                    ble_ret = sendData(buf, 19U);
                     break;
                 }
+
+                /* Packet E: roll/pitch/yaw (rad) + ToF range (m) */
                 case 4:
                 {
+                    f0 = g_processed_imu.combined_roll;
+                    f1 = g_processed_imu.combined_pitch;
+                    f2 = g_processed_imu.gyro_z_rad_abs;
+                    f3 = g_processed_tof.range_m;
                     buf[0] = 0x45U;
-                    memcpy(buf +  1, &ts,                              sizeof(uint16_t));
-                    memcpy(buf +  3, &g_processed_imu.combined_roll,   sizeof(float));
-                    memcpy(buf +  7, &g_processed_imu.combined_pitch,  sizeof(float));
-                    memcpy(buf + 11, &g_processed_imu.gyro_z_rad_abs,  sizeof(float));
-                    memcpy(buf + 15, &g_processed_tof.range_m,         sizeof(float));
-                    sendData(buf, 19U);
+                    memcpy(buf +  1, &ts, sizeof(uint16_t));
+                    memcpy(buf +  3, &f0, sizeof(float));
+                    memcpy(buf +  7, &f1, sizeof(float));
+                    memcpy(buf + 11, &f2, sizeof(float));
+                    memcpy(buf + 15, &f3, sizeof(float));
+                    ble_ret = sendData(buf, 19U);
                     break;
                 }
  
@@ -324,7 +349,9 @@ void MX_BlueNRG_MS_Process(void)
                     break;
             }
  
-            pkt_toggle = (pkt_toggle + 1U) % 5U;
+            if (ble_ret == BLE_STATUS_SUCCESS) {
+                pkt_toggle = (pkt_toggle + 1U) % 5U;
+            }
         }
     }
 

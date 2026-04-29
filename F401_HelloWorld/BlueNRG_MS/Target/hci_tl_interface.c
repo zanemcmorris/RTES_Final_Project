@@ -21,6 +21,7 @@
 #include "RTE_Components.h"
 
 #include "hci_tl.h"
+#include "cmsis_os2.h"
 
 /* Defines -------------------------------------------------------------------*/
 
@@ -30,6 +31,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 EXTI_HandleTypeDef hexti4;
+extern osSemaphoreId_t hciEventSemID;
 
 /******************** IO Operation and BUS services ***************************/
 
@@ -118,7 +120,7 @@ int32_t HCI_TL_SPI_Receive(uint8_t* buffer, uint16_t size)
 
   uint8_t header_master[HEADER_SIZE] = {0x0b, 0x00, 0x00, 0x00, 0x00};
   uint8_t header_slave[HEADER_SIZE];
-
+  HAL_NVIC_DisableIRQ(EXTI4_IRQn);
   /* CS reset */
   HAL_GPIO_WritePin(HCI_TL_SPI_CS_PORT, HCI_TL_SPI_CS_PIN, GPIO_PIN_RESET);
 
@@ -146,7 +148,7 @@ int32_t HCI_TL_SPI_Receive(uint8_t* buffer, uint16_t size)
   }
   /* Release CS line */
   HAL_GPIO_WritePin(HCI_TL_SPI_CS_PORT, HCI_TL_SPI_CS_PIN, GPIO_PIN_SET);
-
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 #if PRINT_CSV_FORMAT
   if (len > 0) {
     print_csv_time();
@@ -176,14 +178,15 @@ int32_t HCI_TL_SPI_Send(uint8_t* buffer, uint16_t size)
 
   static uint8_t read_char_buf[MAX_BUFFER_SIZE];
   uint32_t tickstart = HAL_GetTick();
-
+  HAL_NVIC_DisableIRQ(EXTI4_IRQn);
   do
   {
     result = 0;
 
     /* CS reset */
+     
     HAL_GPIO_WritePin(HCI_TL_SPI_CS_PORT, HCI_TL_SPI_CS_PIN, GPIO_PIN_RESET);
-
+    
     /* Read header */
     BSP_SPI1_SendRecv(header_master, header_slave, HEADER_SIZE);
 
@@ -206,13 +209,13 @@ int32_t HCI_TL_SPI_Send(uint8_t* buffer, uint16_t size)
 
     /* Release CS line */
     HAL_GPIO_WritePin(HCI_TL_SPI_CS_PORT, HCI_TL_SPI_CS_PIN, GPIO_PIN_SET);
-
     if((HAL_GetTick() - tickstart) > TIMEOUT_DURATION)
     {
       result = -3;
       break;
     }
   } while(result < 0);
+    HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
   return result;
 }
@@ -223,7 +226,7 @@ int32_t HCI_TL_SPI_Send(uint8_t* buffer, uint16_t size)
  * @param  None
  * @retval int32_t: 1 if data are present, 0 otherwise
  */
-static int32_t IsDataAvailable(void)
+int32_t IsDataAvailable(void)
 {
   return (HAL_GPIO_ReadPin(HCI_TL_SPI_EXTI_PORT, HCI_TL_SPI_EXTI_PIN) == GPIO_PIN_SET);
 }
@@ -259,7 +262,8 @@ void hci_tl_lowlevel_init(void)
   /* Register event irq handler */
   HAL_EXTI_GetHandle(&hexti4, EXTI_LINE_4);
   HAL_EXTI_RegisterCallback(&hexti4, HAL_EXTI_COMMON_CB_ID, hci_tl_lowlevel_isr);
-  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  //Priority Changes - Likhita
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
   /* USER CODE BEGIN hci_tl_lowlevel_init 3 */
@@ -276,14 +280,25 @@ void hci_tl_lowlevel_init(void)
   */
 void hci_tl_lowlevel_isr(void)
 {
-  /* Call hci_notify_asynch_evt() */
-  while(IsDataAvailable())
-  {
-    if (hci_notify_asynch_evt(NULL))
-    {
-      return;
+        /* Step 1: Read SPI and push event into HCI queue (required for init). */
+    while (IsDataAvailable()) {
+        if (hci_notify_asynch_evt(NULL)) {
+            break;
+        }
     }
-  }
+ 
+    /* Step 2: Wake the BLE task for dispatch and telemetry. */
+    if (hciEventSemID != NULL) {
+        osSemaphoreRelease(hciEventSemID);
+    }
+  /* Call hci_notify_asynch_evt() */
+  // while(IsDataAvailable())
+  // {
+  //   if (hci_notify_asynch_evt(NULL))
+  //   {
+  //     return;
+  //   }
+  // }
 
   /* USER CODE BEGIN hci_tl_lowlevel_isr */
 
