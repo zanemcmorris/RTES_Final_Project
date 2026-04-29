@@ -34,6 +34,7 @@
 #include <stdbool.h>
 #include "rtos_flags.h"
 #include <VL53L0X_def.h>
+#include "hci_tl.h" 
 
 #define HOVER_HEIGHT_M (1)
 
@@ -66,19 +67,19 @@ osThreadAttr_t tofAcquisitionTaskAttr = { .name = "tofAcquisition", .priority =
 osThreadId_t tofAcquisitionTaskID;
 
 osThreadAttr_t baroAcqTaskAttr = { .name = "baroAcq", .priority =
-		(osPriorityRealtime - 4), .stack_size = 1024 };
+		(osPriorityRealtime - 4), .stack_size = 3072};
 osThreadId_t baroAcqTaskID;
 
 osThreadAttr_t RPYTaskAttr = { .name = "rpyPIDTask", .priority =
-		osPriorityRealtime, .stack_size = 1024 };
+		osPriorityRealtime, .stack_size = 1536}; //needed?
 osThreadId_t RPYTaskID;
 
 osThreadAttr_t altitudeTaskAttr = { .name = "altitudePIDTask", .priority =
-		osPriorityRealtime, .stack_size = 1024 };
+		osPriorityRealtime, .stack_size = 1536}; //needed?
 osThreadId_t altitudeTaskID;
 
 osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority =
-		osPriorityLow, .stack_size = 1500 };
+		osPriorityLow, .stack_size = 1536};
 osThreadId_t uartCommTaskID;
 
 osThreadAttr_t bleCommTaskAttr = { .name = "bleComm", .priority = osPriorityLow,
@@ -116,7 +117,7 @@ osMutexId_t pidMutex;
 osSemaphoreId_t IMUReleaseSemID;
 osSemaphoreId_t RPYReleaseSemID;
 osSemaphoreId_t altitudeReleaseSemID;
-
+osSemaphoreId_t hciEventSemID;
 osTimerId_t RPYTimer;
 osTimerId_t altitudeTimer;
 
@@ -312,6 +313,9 @@ void applicationInit(void) {
 	altitudeReleaseSemID = osSemaphoreNew(1, 1, NULL);
 	assert(altitudeReleaseSemID != NULL);
 
+	hciEventSemID = osSemaphoreNew(10, 0, NULL);  
+	assert(hciEventSemID != NULL);
+
 	// Thread creation
 	ledHeartbeatID = osThreadNew(ledHeartbeatTask, NULL, &ledHeartbeatAttr);
 	assert(ledHeartbeatID != 0);
@@ -321,7 +325,7 @@ void applicationInit(void) {
 	assert(imuAcquisitionTaskID != 0);
 
 	tofAcquisitionTaskID = osThreadNew(TOFAcquisitionTask, NULL,
-			&tofAcquisitionTaskAttr);
+		    &tofAcquisitionTaskAttr);
 	assert(tofAcquisitionTaskID != 0);
 
 	baroAcqTaskID = osThreadNew(BaroAcqTask, NULL, &baroAcqTaskAttr);
@@ -429,6 +433,11 @@ void uartCommTask(void *argument) {
 void IMUAcquisitionTask(void *argument) {
 	(void) argument;
 
+	/*
+	 * Start TIM2 from inside the task so the FreeRTOS scheduler is already running
+	 * before TIM2 begins releasing the IMU semaphore from its interrupt callback.
+	 */
+	HAL_NVIC_SetPriority(TIM2_IRQn, 5, 0);
 	assert(HAL_TIM_Base_Start_IT(&htim2) == HAL_OK);
 
 	while (1) {
@@ -471,30 +480,78 @@ void TOFAcquisitionTask(void *argument) {
  * @brief Adding Primary task for Bluetooth to send recevived data from python to UART 
  */
 
+// void bluetoothControlTask(void *argument) {
+// 	printf("Before Init");
+// 	(void) argument;
+// 	MX_BlueNRG_MS_Init();
+// 	// if (BLE_App_Init() != BLE_APP_OK) {
+// 	// 	printf("BLE_App_Init FAILED\r\n");
+// 	//     /* Blink LED fast forever to signal failure */
+// 	//     while (1) {
+// 	//         HAL_GPIO_TogglePin(USER_LED_1_PORT, USER_LED_1_PIN);
+// 	//         osDelay(100);
+// 	//     }
+// 	// }
+// 	// printf("BLE OK — advertising as FCU_NODE\r\n");
+// 	// HAL_GPIO_WritePin(USER_LED_1_PORT, USER_LED_1_PIN, GPIO_PIN_SET);
+// 	printf("BLE middleware init done\r\n");
+// 	uint32_t last_telem_tick = 0;
+// 	uint32_t telem_counter = 0;
+
+// 	while (1) {
+
+// 		uint32_t flags = osEventFlagsWait(bleEventFlags, 7, osFlagsWaitAny,
+// 				10);
+
+// 		if(flags == osFlagsErrorTimeout){
+// 			MX_BlueNRG_MS_Process();   // app layer
+// 			continue;
+// 		}
+
+// 		if(flags & FLAG_BLE_START){
+// 			armMotors = true;
+// 		}
+// 		if(flags & FLAG_BLE_STOP){
+// 			armMotors = false;
+// 		}
+// 	}
+// }
+
 void bluetoothControlTask(void *argument) {
-	printf("Before Init");
-	(void) argument;
-	MX_BlueNRG_MS_Init();
-	printf("BLE middleware init done\r\n");
-	uint32_t last_telem_tick = 0;
-	uint32_t telem_counter = 0;
+    (void) argument;
+    MX_BlueNRG_MS_Init();
+    printf("BLE middleware init done\r\n");
 
-	while (1) {
+    while (1) {
+        // Block until EITHER:
+        //   - EXTI4 fires (hciEventSemID released from ISR), OR
+        //   - 10ms timeout for periodic telemetry
+        uint32_t hci_ready = osSemaphoreAcquire(hciEventSemID, 10);
 
-		uint32_t flags = osEventFlagsWait(bleEventFlags, 7, osFlagsWaitAny, 10);
+        if (hci_ready == osOK) {
+            // Drain ALL pending HCI events atomically.
+            // hci_notify_asynch_evt (SPI read) + hci_user_evt_proc (dispatch)
+            // both run here in task context — no concurrent queue access.
+            while (IsDataAvailable()) {
+                hci_notify_asynch_evt(NULL);
+            }
+        }
 
-		if (flags == osFlagsErrorTimeout) {
-			MX_BlueNRG_MS_Process();   // app layer
-			continue;
-		}
+        // Always run the HCI event processor and telemetry in task context
+        // User_Process_Task();      // replaces User_Process()
+        // hci_user_evt_proc();      // now ONLY called here, never from ISR
+        // Telemetry_Process();      // your packet A-E send logic
+		MX_BlueNRG_MS_Process();
 
-		if (flags & FLAG_BLE_START) {
-			armMotors = true;
-		}
-		if (flags & FLAG_BLE_STOP) {
-			armMotors = false;
-		}
-	}
+        // Handle BLE command flags (non-blocking check)
+        uint32_t flags = osEventFlagsWait(bleEventFlags, 
+                                          FLAG_BLE_START | FLAG_BLE_STOP,
+                                          osFlagsWaitAny, 0);  // 0 = no wait
+        if (!(flags & 0x80000000U)) {
+            if (flags & FLAG_BLE_START) armMotors = true;
+            if (flags & FLAG_BLE_STOP)  armMotors = false;
+        }
+    }
 }
 /* USER CODE END Application */
 
