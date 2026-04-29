@@ -73,7 +73,6 @@ volatile uint32_t g_sensor_baro_cycles_last = 0;
 volatile uint32_t g_sensor_baro_cycles_max = 0;
 volatile uint32_t g_sensor_baro_cycles_min = 0xFFFFFFFFU;
 
-
 static uint32_t micros(void) {
 	return (uint32_t) ((HAL_GetTick() * 1000U)
 			+ ((SysTick->LOAD - SysTick->VAL) * 1000U) / (SysTick->LOAD + 1U));
@@ -254,57 +253,40 @@ int32_t MX_LSM6DSR_Init(void) {
 		return LSM6DSR_ERROR;
 
 	if (LSM6DSR_ACC_SetOutputDataRate(&MotionSensor,
-			IMU_SAMPLING_FREQ) != LSM6DSR_OK)
+	IMU_SAMPLING_FREQ) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 	if (LSM6DSR_ACC_SetFullScale(&MotionSensor, fullScale) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
-	/* Accelerometer LPF2 enable */
 	if (lsm6dsr_xl_filter_lp2_set(&MotionSensor.Ctx,
-			PROPERTY_ENABLE) != LSM6DSR_OK)
+	PROPERTY_ENABLE) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
-	/*
-	 * Accelerometer LPF cutoff selection.
-	 * More aggressive filtering = larger divisor.
-	 * Good starting point: ODR / 10.
-	 */
 	if (lsm6dsr_xl_hp_path_on_out_set(&MotionSensor.Ctx,
 			LSM6DSR_LP_ODR_DIV_10) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
 	if (LSM6DSR_GYRO_SetOutputDataRate(&MotionSensor,
-			IMU_SAMPLING_FREQ) != LSM6DSR_OK)
-		return LSM6DSR_ERROR; // TODO: Make sure these enum defns match the #defined period and freq
+	IMU_SAMPLING_FREQ) != LSM6DSR_OK)
+		return LSM6DSR_ERROR;
 
 	if (LSM6DSR_GYRO_SetFullScale(&MotionSensor, LSM6DSR_250dps) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
-	/* Gyroscope LPF1 enable */
 	if (lsm6dsr_gy_filter_lp1_set(&MotionSensor.Ctx,
-			PROPERTY_ENABLE) != LSM6DSR_OK)
+	PROPERTY_ENABLE) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
-	/*
-	 * Gyroscope LPF1 bandwidth.
-	 * Options in your driver include:
-	 * LSM6DSR_ULTRA_LIGHT, VERY_LIGHT, LIGHT, MEDIUM,
-	 * STRONG, VERY_STRONG, AGGRESSIVE, XTREME.
-	 *
-	 * Medium is a reasonable starting point.
-	 */
 	if (lsm6dsr_gy_lp1_bandwidth_set(&MotionSensor.Ctx,
 			LSM6DSR_MEDIUM) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
-	/* Optional: mask DRDY until filters have settled */
 	if (lsm6dsr_filter_settling_mask_set(&MotionSensor.Ctx,
-			PROPERTY_ENABLE) != LSM6DSR_OK)
+	PROPERTY_ENABLE) != LSM6DSR_OK)
 		return LSM6DSR_ERROR;
 
 	return LSM6DSR_OK;
 }
-
 
 static int32_t MX_LSM6DSR_FIFO_Test_Init(void) {
 	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
@@ -353,60 +335,56 @@ int32_t MX_LPS22HH_Init(void) {
 			LPS22HH_LPF_ODR_DIV_9) != LPS22HH_OK)
 		return LPS22HH_ERROR;
 
-	if (LPS22HH_PRESS_SetOutputDataRate(&BaroSensor, (float)BARO_SAMPLING_FREQ_HZ) != LPS22HH_OK)
+	if (LPS22HH_PRESS_SetOutputDataRate(&BaroSensor,
+			(float) BARO_SAMPLING_FREQ_HZ) != LPS22HH_OK)
 		return LPS22HH_ERROR;
-	if (LPS22HH_TEMP_SetOutputDataRate(&BaroSensor, (float)BARO_SAMPLING_FREQ_HZ) != LPS22HH_OK)
+	if (LPS22HH_TEMP_SetOutputDataRate(&BaroSensor,
+			(float) BARO_SAMPLING_FREQ_HZ) != LPS22HH_OK)
 		return LPS22HH_ERROR;
 
 	return LPS22HH_OK;
 }
-int32_t vl53l0x_api_init_device(void)
-{
-    VL53L0X_Error status;
-    uint8_t vhv_settings = 0;
-    uint8_t phase_cal = 0;
-    uint32_t ref_spad_count = 0;
-    uint8_t is_aperture_spads = 0;
+int32_t vl53l0x_api_init_device(void) {
+	VL53L0X_Error status;
+	uint8_t vhv_settings = 0;
+	uint8_t phase_cal = 0;
+	uint32_t ref_spad_count = 0;
+	uint8_t is_aperture_spads = 0;
 
-    vl53l0x_setup_device_struct();
+	vl53l0x_setup_device_struct();
 
-    status = VL53L0X_DataInit(&g_vl53l0x_dev);
-    if (status != VL53L0X_ERROR_NONE)
-	{
+	status = VL53L0X_DataInit(&g_vl53l0x_dev);
+	if (status != VL53L0X_ERROR_NONE) {
 		return status;
 	}
 
-    status = VL53L0X_StaticInit(&g_vl53l0x_dev);
-    if (status != VL53L0X_ERROR_NONE)
-	{
+	status = VL53L0X_StaticInit(&g_vl53l0x_dev);
+	if (status != VL53L0X_ERROR_NONE) {
 		return status;
 	}
 
-    status = VL53L0X_PerformRefSpadManagement(&g_vl53l0x_dev,
-             &ref_spad_count, &is_aperture_spads);
-    if (status != VL53L0X_ERROR_NONE)
-	{
+	status = VL53L0X_PerformRefSpadManagement(&g_vl53l0x_dev, &ref_spad_count,
+			&is_aperture_spads);
+	if (status != VL53L0X_ERROR_NONE) {
 		return status;
 	}
 
-    status = VL53L0X_PerformRefCalibration(&g_vl53l0x_dev,
-             &vhv_settings, &phase_cal);
-    if (status != VL53L0X_ERROR_NONE)
-	{
+	status = VL53L0X_PerformRefCalibration(&g_vl53l0x_dev, &vhv_settings,
+			&phase_cal);
+	if (status != VL53L0X_ERROR_NONE) {
 		return status;
 	}
 
-    // changing to continuous mode
-    status = VL53L0X_SetDeviceMode(&g_vl53l0x_dev,
-             VL53L0X_DEVICEMODE_CONTINUOUS_RANGING);
-    if (status != VL53L0X_ERROR_NONE)
-	{
+	// changing to continuous mode
+	status = VL53L0X_SetDeviceMode(&g_vl53l0x_dev,
+	VL53L0X_DEVICEMODE_CONTINUOUS_RANGING);
+	if (status != VL53L0X_ERROR_NONE) {
 		return status;
 	}
 
-    // Starting continuous measurement
-    status = VL53L0X_StartMeasurement(&g_vl53l0x_dev);
-    return status;
+	// Starting continuous measurement
+	status = VL53L0X_StartMeasurement(&g_vl53l0x_dev);
+	return status;
 }
 
 static void preprocess_imu_sample(const raw_imu_sample_t *raw,
@@ -452,6 +430,32 @@ static void preprocess_imu_sample(const raw_imu_sample_t *raw,
 	proc->gyro_z_rad_abs += proc->gyro_z_rps
 			* (IMU_SAMPLING_PERIOD_MS / 1000.0);
 
+	// Zane 4/28/26. 10:38PM: This code was meant to wrap the angle back around
+	// It seemed to be too slow? I couldn't effectively test with it.
+
+//	if (fabs(proc->gyro_x_rad_abs) >= TWO_PI) {
+//		if (proc->gyro_x_rad_abs < 0) {
+//			proc->gyro_x_rad_abs += TWO_PI;
+//		} else {
+//			proc->gyro_x_rad_abs -= TWO_PI;
+//		}
+//	}
+//
+//	if (fabs(proc->gyro_y_rad_abs) >= TWO_PI) {
+//		if (proc->gyro_y_rad_abs < 0) {
+//			proc->gyro_y_rad_abs += TWO_PI;
+//		} else {
+//			proc->gyro_y_rad_abs -= TWO_PI;
+//		}
+//	}
+//	if (fabs(proc->gyro_z_rad_abs) >= TWO_PI) {
+//		if (proc->gyro_z_rad_abs < 0) {
+//			proc->gyro_z_rad_abs += TWO_PI;
+//		} else {
+//			proc->gyro_z_rad_abs -= TWO_PI;
+//		}
+//	}
+
 	proc->accel_roll = atan2f(proc->accel_y_g, proc->accel_z_g);
 	proc->accel_pitch = atan2f(-1 * proc->accel_x_g,
 			sqrtf(
@@ -489,12 +493,13 @@ static void preprocess_tof_sample(const raw_tof_sample_t *raw,
 	proc->range_m = raw->range_mm / 1000.0f;
 
 	osMutexAcquire(IMUDataMutexID, osWaitForever);
-	proc->range_m = proc->range_m * cosf(g_processed_imu.combined_pitch) * cosf(g_processed_imu.combined_roll);
-	if(fabs(g_processed_imu.combined_pitch) > PI_OVER_4 || g_processed_imu.combined_roll > PI_OVER_4){
+	proc->range_m = proc->range_m * cosf(g_processed_imu.combined_pitch)
+			* cosf(g_processed_imu.combined_roll);
+	if (fabs(g_processed_imu.combined_pitch) > PI_OVER_4
+			|| g_processed_imu.combined_roll > PI_OVER_4) {
 		proc->valid = false;
 	}
 	osMutexRelease(IMUDataMutexID);
-
 
 }
 
@@ -706,72 +711,39 @@ static void vl53l0x_single_range_test(void) {
 	vl53l0x_uart_send_line(msg);
 }
 
-void vl53l0x_acquire_one_sample(void)
-{
-    VL53L0X_Error status;
-    VL53L0X_RangingMeasurementData_t measurement;
-    uint8_t data_ready = 0;
-    uint32_t timeout_start = HAL_GetTick();
+void vl53l0x_acquire_one_sample(void) {
+	VL53L0X_Error status;
+	VL53L0X_RangingMeasurementData_t measurement;
+	uint8_t data_ready = 0;
+	uint32_t timeout_start = HAL_GetTick();
 
-    // Wait till ready
-    do {
-        status = VL53L0X_GetMeasurementDataReady(&g_vl53l0x_dev, &data_ready);
-        if (status != VL53L0X_ERROR_NONE) break;
+	// Wait till ready
+	do {
+		status = VL53L0X_GetMeasurementDataReady(&g_vl53l0x_dev, &data_ready);
+		if (status != VL53L0X_ERROR_NONE)
+			break;
 		//Time out if it exceeds 100msec
-        if ((HAL_GetTick() - timeout_start) > 100) {
-            g_raw_tof.valid = 0;
-            return;
-        }
-    } while (data_ready == 0);
+		if ((HAL_GetTick() - timeout_start) > 100) {
+			g_raw_tof.valid = 0;
+			return;
+		}
+	} while (data_ready == 0);
 
-    status = VL53L0X_GetRangingMeasurementData(&g_vl53l0x_dev, &measurement);
+	status = VL53L0X_GetRangingMeasurementData(&g_vl53l0x_dev, &measurement);
 
-    VL53L0X_ClearInterruptMask(&g_vl53l0x_dev, 0);
+	VL53L0X_ClearInterruptMask(&g_vl53l0x_dev, 0);
 
-    g_raw_tof.timestamp_us = micros();
-    g_raw_tof.range_mm     = measurement.RangeMilliMeter;
-    g_raw_tof.range_status = measurement.RangeStatus;
-    g_raw_tof.valid        = (status == VL53L0X_ERROR_NONE &&
-                               measurement.RangeStatus == 0U) ? 1U : 0U;
+	g_raw_tof.timestamp_us = micros();
+	g_raw_tof.range_mm = measurement.RangeMilliMeter;
+	g_raw_tof.range_status = measurement.RangeStatus;
+	g_raw_tof.valid =
+			(status == VL53L0X_ERROR_NONE && measurement.RangeStatus == 0U) ?
+					1U : 0U;
 
-    osMutexAcquire(tofDataMutexID, osWaitForever);
-    preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
-    osMutexRelease(tofDataMutexID);
-
-   // printf("TOF: %u mm valid=%u\r\n", g_raw_tof.range_mm, g_raw_tof.valid);
+	osMutexAcquire(tofDataMutexID, osWaitForever);
+	preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
+	osMutexRelease(tofDataMutexID);
 }
-
-//Removing because it is for single mode
-// void vl53l0x_acquire_one_sample(void) {
-// 	VL53L0X_Error status;
-// 	VL53L0X_RangingMeasurementData_t measurement;
-
-// 	// status = vl53l0x_api_init_device();
-// 	// if (status != VL53L0X_ERROR_NONE) {
-// 	// 	g_raw_tof.timestamp_us = micros();
-// 	// 	g_raw_tof.range_mm = 0;
-// 	// 	g_raw_tof.range_status = (uint8_t) status;
-// 	// 	g_raw_tof.valid = 0;
-
-// 	// 	preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
-// 	// 	return;
-// 	// }
-
-// 	status = VL53L0X_PerformSingleRangingMeasurement(&g_vl53l0x_dev,
-// 			&measurement);
-
-// 	g_raw_tof.timestamp_us = micros();
-// 	g_raw_tof.range_mm = measurement.RangeMilliMeter;
-// 	g_raw_tof.range_status = measurement.RangeStatus;
-// 	g_raw_tof.valid =
-// 			(status == VL53L0X_ERROR_NONE && measurement.RangeStatus == 0U) ?
-// 					1U : 0U;
-
-// 	osMutexAcquire(tofDataMutexID, osWaitForever);
-// 	preprocess_tof_sample(&g_raw_tof, &g_processed_tof);
-// 	osMutexRelease(tofDataMutexID);
-// 	printf("%u mm/n",g_raw_tof.range_mm );
-// }
 
 static void calibrate_gyro_bias(void) {
 	const uint32_t num_samples = 150;
@@ -878,8 +850,22 @@ int32_t SensorManager_Init(void) {
 	assert(MX_LSM6DSR_Init() == LSM6DSR_OK);
 	assert(MX_LSM6DSR_FIFO_Test_Init() == LSM6DSR_OK);
 	assert(MX_LPS22HH_Init() == LPS22HH_OK);
+	assert(vl53l0x_api_init_device() == VL53L0X_ERROR_NONE);
+
+	setUserLEDOne(1);
+	HAL_Delay(2500); // Startup delay to get fingers out the way.
+	setUserLEDOne(0);
 
 	calibrate_gyro_bias();
+
+	setUserLEDOne(1);
+	HAL_Delay(100);
+	setUserLEDOne(0);
+	HAL_Delay(100);
+
+	setUserLEDOne(1);
+	HAL_Delay(100);
+	setUserLEDOne(0);
 
 	g_imu_task_loops = 0;
 	g_acc_ready_count = 0;
@@ -889,8 +875,6 @@ int32_t SensorManager_Init(void) {
 
 	return 0;
 }
-
-
 
 void SensorManager_RunIMUOnce(void) {
 	static LSM6DSR_Axes_t accel = { 0 };
@@ -952,15 +936,12 @@ void SensorManager_RunIMUOnce(void) {
 	}
 }
 
-
 void SensorManager_RunBaroOnce(void) {
 	static float pressure_hpa = 0.0f;
 	static float temperature_c = 0.0f;
 
 	uint8_t press_ready = 0;
 	uint8_t temp_ready = 0;
-
-	uint32_t start_cycles = DWT->CYCCNT;
 
 	LPS22HH_PRESS_Get_DRDY_Status(&BaroSensor, &press_ready);
 	LPS22HH_TEMP_Get_DRDY_Status(&BaroSensor, &temp_ready);
@@ -973,6 +954,7 @@ void SensorManager_RunBaroOnce(void) {
 	if (temp_ready) {
 		LPS22HH_TEMP_GetTemperature(&BaroSensor, &temperature_c);
 	}
+	uint32_t start_cycles = DWT->CYCCNT;
 
 	g_raw_baro.timestamp_us = micros();
 	g_raw_baro.pressure_hpa = pressure_hpa;
@@ -983,8 +965,8 @@ void SensorManager_RunBaroOnce(void) {
 	osMutexAcquire(altitudeDataMutexID, osWaitForever);
 	preprocess_baro_sample(&g_raw_baro, &g_processed_baro);
 	osMutexRelease(altitudeDataMutexID);
-
 	uint32_t end_cycles = DWT->CYCCNT;
+
 	uint32_t diff_cycles = end_cycles - start_cycles;
 
 	g_sensor_baro_cycles_last = diff_cycles;
@@ -998,22 +980,11 @@ void SensorManager_RunBaroOnce(void) {
 	}
 }
 
-
 void SensorManager_RunOnce(void) {
 	uint32_t start_cycles = DWT->CYCCNT;
 
 	SensorManager_RunIMUOnce();
 	SensorManager_RunBaroOnce();
-
-	/*
-	 * Keeping all debug TX behavior exactly as it is now: still commented.
-	 */
-	/* imu_uart_send_raw_line(&accel, &gyro); */
-	/* imu_uart_send_processed_line(&g_processed_imu); */
-	/* baro_uart_send_processed_line(&g_processed_baro); */
-	/* debug_output_send_current_mode(&accel, &gyro, &g_processed_imu, &g_processed_baro); */
-	/* baro_overrun_send_line(); */
-	/* imu_fifo_send_line(); */
 
 	uint32_t end_cycles = DWT->CYCCNT;
 	uint32_t diff_cycles = end_cycles - start_cycles;
@@ -1028,9 +999,6 @@ void SensorManager_RunOnce(void) {
 		g_sensor_runonce_cycles_min = diff_cycles;
 	}
 
-	/*
-	 * Keep these unused helper references in file so compiler does not warn if needed later.
-	 */
 	(void) g_debug_output_mode;
 	(void) g_processed_tof;
 	(void) vl53l0x_basic_i2c_test;

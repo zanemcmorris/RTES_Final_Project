@@ -11,11 +11,14 @@ extern "C" {
 #include "lps22hh.h"
 #include <stdint.h>
 
-#define IMU_SAMPLING_FREQ (3333)
+#define IMU_SAMPLING_FREQ (417)
 #define IMU_SAMPLING_PERIOD_MS (1000.0 / IMU_SAMPLING_FREQ)
 
 #define BARO_SAMPLING_FREQ_HZ     (100U)
 #define BARO_SAMPLING_PERIOD_MS   (1000U / BARO_SAMPLING_FREQ_HZ)
+
+#define TOF_SAMPLING_FREQ_HZ (30)
+#define TOF_SAMPLING_PERIOD_MS (1000/TOF_SAMPLING_FREQ_HZ)
 
 #define IMU_CS_PORT  GPIOA
 #define IMU_CS_PIN   GPIO_PIN_8
@@ -30,6 +33,9 @@ extern "C" {
 #define GRAVITY_MPS2  (9.80665f)
 #define DEG_TO_RAD    (0.01745329252f)
 #define SEA_LEVEL_HPA (1013.25f)
+
+#define TWO_PI (6.28318530718)
+
 
 
 
@@ -163,7 +169,6 @@ void SensorManager_RunIMUOnce(void);
 void SensorManager_RunBaroOnce(void);
 int32_t MX_LSM6DSR_Init(void);
 int32_t MX_LPS22HH_Init(void);
-//void vl53l0x_acquire_one_sample(void);
 int32_t vl53l0x_api_init_device(void);
 void vl53l0x_cfg_INT(void);
 void vl53l0x_start_next_measurement(void);
