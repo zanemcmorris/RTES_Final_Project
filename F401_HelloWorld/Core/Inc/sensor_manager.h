@@ -14,6 +14,9 @@ extern "C" {
 #define IMU_SAMPLING_FREQ (3333)
 #define IMU_SAMPLING_PERIOD_MS (1000.0 / IMU_SAMPLING_FREQ)
 
+#define BARO_SAMPLING_FREQ_HZ     (100U)
+#define BARO_SAMPLING_PERIOD_MS   (1000U / BARO_SAMPLING_FREQ_HZ)
+
 #define IMU_CS_PORT  GPIOA
 #define IMU_CS_PIN   GPIO_PIN_8
 #define BARO_CS_PORT GPIOC
@@ -28,9 +31,23 @@ extern "C" {
 #define DEG_TO_RAD    (0.01745329252f)
 #define SEA_LEVEL_HPA (1013.25f)
 
+
+
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
 extern I2C_HandleTypeDef hi2c2;
+
+extern volatile uint32_t g_sensor_runonce_cycles_last;
+extern volatile uint32_t g_sensor_runonce_cycles_max;
+extern volatile uint32_t g_sensor_runonce_cycles_min;
+
+extern volatile uint32_t g_sensor_imu_cycles_last;
+extern volatile uint32_t g_sensor_imu_cycles_max;
+extern volatile uint32_t g_sensor_imu_cycles_min;
+
+extern volatile uint32_t g_sensor_baro_cycles_last;
+extern volatile uint32_t g_sensor_baro_cycles_max;
+extern volatile uint32_t g_sensor_baro_cycles_min;
 typedef struct
 {
     SPI_HandleTypeDef *hspi;
@@ -142,6 +159,8 @@ extern processed_tof_sample_t g_processed_tof;
 
 int32_t SensorManager_Init(void);
 void SensorManager_RunOnce(void);
+void SensorManager_RunIMUOnce(void);
+void SensorManager_RunBaroOnce(void);
 int32_t MX_LSM6DSR_Init(void);
 int32_t MX_LPS22HH_Init(void);
 //void vl53l0x_acquire_one_sample(void);

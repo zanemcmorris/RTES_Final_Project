@@ -65,6 +65,15 @@ volatile uint32_t g_sensor_runonce_cycles_last = 0;
 volatile uint32_t g_sensor_runonce_cycles_max = 0;
 volatile uint32_t g_sensor_runonce_cycles_min = 0xFFFFFFFFU;
 
+volatile uint32_t g_sensor_imu_cycles_last = 0;
+volatile uint32_t g_sensor_imu_cycles_max = 0;
+volatile uint32_t g_sensor_imu_cycles_min = 0xFFFFFFFFU;
+
+volatile uint32_t g_sensor_baro_cycles_last = 0;
+volatile uint32_t g_sensor_baro_cycles_max = 0;
+volatile uint32_t g_sensor_baro_cycles_min = 0xFFFFFFFFU;
+
+
 static uint32_t micros(void) {
 	return (uint32_t) ((HAL_GetTick() * 1000U)
 			+ ((SysTick->LOAD - SysTick->VAL) * 1000U) / (SysTick->LOAD + 1U));
@@ -363,9 +372,9 @@ int32_t MX_LPS22HH_Init(void) {
 			LPS22HH_LPF_ODR_DIV_9) != LPS22HH_OK)
 		return LPS22HH_ERROR;
 
-	if (LPS22HH_PRESS_SetOutputDataRate(&BaroSensor, 10.0f) != LPS22HH_OK)
+	if (LPS22HH_PRESS_SetOutputDataRate(&BaroSensor, (float)BARO_SAMPLING_FREQ_HZ) != LPS22HH_OK)
 		return LPS22HH_ERROR;
-	if (LPS22HH_TEMP_SetOutputDataRate(&BaroSensor, 10.0f) != LPS22HH_OK)
+	if (LPS22HH_TEMP_SetOutputDataRate(&BaroSensor, (float)BARO_SAMPLING_FREQ_HZ) != LPS22HH_OK)
 		return LPS22HH_ERROR;
 
 	return LPS22HH_OK;
@@ -900,18 +909,123 @@ int32_t SensorManager_Init(void) {
 	return 0;
 }
 
-void SensorManager_RunOnce(void) {
+//void SensorManager_RunOnce(void) {
+//	static LSM6DSR_Axes_t accel = { 0 };
+//	static LSM6DSR_Axes_t gyro = { 0 };
+//	static float pressure_hpa = 0.0f;
+//	static float temperature_c = 0.0f;
+//
+//	uint8_t acc_ready = 0;
+//	uint8_t gyro_ready = 0;
+//	uint8_t press_ready = 0;
+//	uint8_t temp_ready = 0;
+//
+//	//uint32_t startClock = 0, endClock = 0, diffClock = 0;
+//
+//	uint32_t start_cycles = DWT->CYCCNT;
+//
+//	g_imu_task_loops++;
+//
+//	LSM6DSR_ACC_Get_DRDY_Status(&MotionSensor, &acc_ready);
+//	LSM6DSR_GYRO_Get_DRDY_Status(&MotionSensor, &gyro_ready);
+//
+//	if (acc_ready) {
+//		g_acc_ready_count++;
+//	}
+//
+//	if (gyro_ready) {
+//		g_gyro_ready_count++;
+//	}
+//
+//	if (acc_ready) {
+//		LSM6DSR_ACC_GetAxes(&MotionSensor, &accel);
+//		g_acc_read_count++;
+//	}
+//
+//	if (gyro_ready) {
+//		LSM6DSR_GYRO_GetAxes(&MotionSensor, &gyro);
+//		g_gyro_read_count++;
+//	}
+//
+//	g_raw_imu.timestamp_us = micros();
+//	g_raw_imu.accel_x_mg = accel.x;
+//	g_raw_imu.accel_y_mg = accel.y;
+//	g_raw_imu.accel_z_mg = accel.z;
+//	g_raw_imu.gyro_x_mdps = gyro.x;
+//	g_raw_imu.gyro_y_mdps = gyro.y;
+//	g_raw_imu.gyro_z_mdps = gyro.z;
+//	g_raw_imu.accel_ready = acc_ready;
+//	g_raw_imu.gyro_ready = gyro_ready;
+//
+//	osMutexAcquire(IMUDataMutexID, osWaitForever);
+//	preprocess_imu_sample(&g_raw_imu, &g_processed_imu);
+//	osMutexRelease(IMUDataMutexID);
+//
+//	LPS22HH_PRESS_Get_DRDY_Status(&BaroSensor, &press_ready);
+//	LPS22HH_TEMP_Get_DRDY_Status(&BaroSensor, &temp_ready);
+//	check_baro_overrun_flags();
+//
+//	if (press_ready) {
+//		LPS22HH_PRESS_GetPressure(&BaroSensor, &pressure_hpa);
+//	}
+//
+//	if (temp_ready) {
+//		LPS22HH_TEMP_GetTemperature(&BaroSensor, &temperature_c);
+//	}
+//
+//	g_raw_baro.timestamp_us = micros();
+//	g_raw_baro.pressure_hpa = pressure_hpa;
+//	g_raw_baro.temperature_c = temperature_c;
+//	g_raw_baro.pressure_ready = press_ready;
+//	g_raw_baro.temperature_ready = temp_ready;
+//
+//	osMutexAcquire(altitudeDataMutexID, osWaitForever);
+//	preprocess_baro_sample(&g_raw_baro, &g_processed_baro);
+//	osMutexRelease(altitudeDataMutexID);
+//
+//	/* Keeping all debug TX behavior exactly as it is now: still commented */
+//	/* imu_uart_send_raw_line(&accel, &gyro); */
+//	/* imu_uart_send_processed_line(&g_processed_imu); */
+//	/* baro_uart_send_processed_line(&g_processed_baro); */
+//	/* debug_output_send_current_mode(&accel, &gyro, &g_processed_imu, &g_processed_baro); */
+//	/* baro_overrun_send_line(); */
+//	/* imu_fifo_send_line(); */
+//
+//
+//
+//
+//    uint32_t end_cycles = DWT->CYCCNT;
+//    uint32_t diff_cycles = end_cycles - start_cycles;
+//
+//    g_sensor_runonce_cycles_last = diff_cycles;
+//
+//    if (diff_cycles > g_sensor_runonce_cycles_max) {
+//        g_sensor_runonce_cycles_max = diff_cycles;
+//    }
+//
+//    if (diff_cycles < g_sensor_runonce_cycles_min) {
+//        g_sensor_runonce_cycles_min = diff_cycles;
+//    }
+//
+//	/* Keep these unused helper references in file so compiler does not warn if needed later */
+//	(void) g_debug_output_mode;
+//	(void) g_processed_tof;
+//	(void) vl53l0x_basic_i2c_test;
+//	(void) vl53l0x_api_init_test;
+//	(void) vl53l0x_single_range_test;
+//	(void) vl53l0x_acquire_one_sample;
+//	(void) tof_uart_send_processed_line;
+//	(void) debug_output_send_current_mode;
+//	(void) baro_overrun_send_line;
+//	(void) imu_fifo_send_line;
+//}
+
+void SensorManager_RunIMUOnce(void) {
 	static LSM6DSR_Axes_t accel = { 0 };
 	static LSM6DSR_Axes_t gyro = { 0 };
-	static float pressure_hpa = 0.0f;
-	static float temperature_c = 0.0f;
 
 	uint8_t acc_ready = 0;
 	uint8_t gyro_ready = 0;
-	uint8_t press_ready = 0;
-	uint8_t temp_ready = 0;
-
-	//uint32_t startClock = 0, endClock = 0, diffClock = 0;
 
 	uint32_t start_cycles = DWT->CYCCNT;
 
@@ -952,6 +1066,30 @@ void SensorManager_RunOnce(void) {
 	preprocess_imu_sample(&g_raw_imu, &g_processed_imu);
 	osMutexRelease(IMUDataMutexID);
 
+	uint32_t end_cycles = DWT->CYCCNT;
+	uint32_t diff_cycles = end_cycles - start_cycles;
+
+	g_sensor_imu_cycles_last = diff_cycles;
+
+	if (diff_cycles > g_sensor_imu_cycles_max) {
+		g_sensor_imu_cycles_max = diff_cycles;
+	}
+
+	if (diff_cycles < g_sensor_imu_cycles_min) {
+		g_sensor_imu_cycles_min = diff_cycles;
+	}
+}
+
+
+void SensorManager_RunBaroOnce(void) {
+	static float pressure_hpa = 0.0f;
+	static float temperature_c = 0.0f;
+
+	uint8_t press_ready = 0;
+	uint8_t temp_ready = 0;
+
+	uint32_t start_cycles = DWT->CYCCNT;
+
 	LPS22HH_PRESS_Get_DRDY_Status(&BaroSensor, &press_ready);
 	LPS22HH_TEMP_Get_DRDY_Status(&BaroSensor, &temp_ready);
 	check_baro_overrun_flags();
@@ -974,7 +1112,30 @@ void SensorManager_RunOnce(void) {
 	preprocess_baro_sample(&g_raw_baro, &g_processed_baro);
 	osMutexRelease(altitudeDataMutexID);
 
-	/* Keeping all debug TX behavior exactly as it is now: still commented */
+	uint32_t end_cycles = DWT->CYCCNT;
+	uint32_t diff_cycles = end_cycles - start_cycles;
+
+	g_sensor_baro_cycles_last = diff_cycles;
+
+	if (diff_cycles > g_sensor_baro_cycles_max) {
+		g_sensor_baro_cycles_max = diff_cycles;
+	}
+
+	if (diff_cycles < g_sensor_baro_cycles_min) {
+		g_sensor_baro_cycles_min = diff_cycles;
+	}
+}
+
+
+void SensorManager_RunOnce(void) {
+	uint32_t start_cycles = DWT->CYCCNT;
+
+	SensorManager_RunIMUOnce();
+	SensorManager_RunBaroOnce();
+
+	/*
+	 * Keeping all debug TX behavior exactly as it is now: still commented.
+	 */
 	/* imu_uart_send_raw_line(&accel, &gyro); */
 	/* imu_uart_send_processed_line(&g_processed_imu); */
 	/* baro_uart_send_processed_line(&g_processed_baro); */
@@ -982,23 +1143,22 @@ void SensorManager_RunOnce(void) {
 	/* baro_overrun_send_line(); */
 	/* imu_fifo_send_line(); */
 
+	uint32_t end_cycles = DWT->CYCCNT;
+	uint32_t diff_cycles = end_cycles - start_cycles;
 
+	g_sensor_runonce_cycles_last = diff_cycles;
 
+	if (diff_cycles > g_sensor_runonce_cycles_max) {
+		g_sensor_runonce_cycles_max = diff_cycles;
+	}
 
-    uint32_t end_cycles = DWT->CYCCNT;
-    uint32_t diff_cycles = end_cycles - start_cycles;
+	if (diff_cycles < g_sensor_runonce_cycles_min) {
+		g_sensor_runonce_cycles_min = diff_cycles;
+	}
 
-    g_sensor_runonce_cycles_last = diff_cycles;
-
-    if (diff_cycles > g_sensor_runonce_cycles_max) {
-        g_sensor_runonce_cycles_max = diff_cycles;
-    }
-
-    if (diff_cycles < g_sensor_runonce_cycles_min) {
-        g_sensor_runonce_cycles_min = diff_cycles;
-    }
-
-	/* Keep these unused helper references in file so compiler does not warn if needed later */
+	/*
+	 * Keep these unused helper references in file so compiler does not warn if needed later.
+	 */
 	(void) g_debug_output_mode;
 	(void) g_processed_tof;
 	(void) vl53l0x_basic_i2c_test;
@@ -1008,5 +1168,4 @@ void SensorManager_RunOnce(void) {
 	(void) tof_uart_send_processed_line;
 	(void) debug_output_send_current_mode;
 	(void) baro_overrun_send_line;
-	(void) imu_fifo_send_line;
 }
