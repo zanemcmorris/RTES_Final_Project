@@ -61,10 +61,15 @@ osThreadAttr_t imuAcquisitionTaskAttr = { .name = "imuAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536 };
 osThreadId_t imuAcquisitionTaskID;
 
+
+
 osThreadAttr_t tofAcquisitionTaskAttr = { .name = "tofAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536 };
 osThreadId_t tofAcquisitionTaskID;
 
+osThreadAttr_t baroAcqTaskAttr = { .name = "baroAcq", .priority =
+		(osPriorityRealtime - 4), .stack_size = 1024 };
+osThreadId_t baroAcqTaskID;
 
 osThreadAttr_t RPYTaskAttr = { .name = "rpyPIDTask", .priority =
 		osPriorityRealtime, .stack_size = 1024 }; //needed?
@@ -163,6 +168,7 @@ void uartCommTask(void *argument);
 void IMUAcquisitionTask(void *argument);
 void TOFAcquisitionTask(void *argument);
 void flightControlTask(void *argument);
+void BaroAcqTask(void *argument);
 void RPY_PID_task(void *arguments);
 void altitude_PID_task(void *arguments);
 void bluetoothControlTask(void *argument);
@@ -207,23 +213,6 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 	}
 }
 
-/*void PrintFreeRTOSStats(void)
-{
-    char buf[512];
-
-    memset(buf, 0, sizeof(buf));
-
-    snprintf(buf, sizeof(buf),
-             "\r\nTask          Abs Time      %% Time\r\n"
-             "--------------------------------------\r\n");
-
-    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
-
-    memset(buf, 0, sizeof(buf));
-    vTaskGetRunTimeStats(buf);
-
-    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
-}*/
 
 void PrintFreeRTOSStats(void)
 {
@@ -234,8 +223,34 @@ void PrintFreeRTOSStats(void)
     snprintf(buf, sizeof(buf),
              "\r\nTask          Abs Time      %% Time\r\n"
              "--------------------------------------\r\n");
-
     HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
+
+    snprintf(buf, sizeof(buf),
+    		"\r\nIMU only cycles:\r\n"
+    		"  last: %lu cycles = %lu us\r\n"
+    		"  min : %lu cycles = %lu us\r\n"
+    		"  max : %lu cycles = %lu us\r\n",
+    		(unsigned long) g_sensor_imu_cycles_last,
+    		(unsigned long) (g_sensor_imu_cycles_last / 84U),
+    		(unsigned long) g_sensor_imu_cycles_min,
+    		(unsigned long) (g_sensor_imu_cycles_min / 84U),
+    		(unsigned long) g_sensor_imu_cycles_max,
+    		(unsigned long) (g_sensor_imu_cycles_max / 84U));
+    HAL_UART_Transmit(&huart1, (uint8_t*) buf, strlen(buf), HAL_MAX_DELAY);
+
+    snprintf(buf, sizeof(buf),
+    		"\r\nBarometer only cycles:\r\n"
+    		"  last: %lu cycles = %lu us\r\n"
+    		"  min : %lu cycles = %lu us\r\n"
+    		"  max : %lu cycles = %lu us\r\n",
+    		(unsigned long) g_sensor_baro_cycles_last,
+    		(unsigned long) (g_sensor_baro_cycles_last / 84U),
+    		(unsigned long) g_sensor_baro_cycles_min,
+    		(unsigned long) (g_sensor_baro_cycles_min / 84U),
+    		(unsigned long) g_sensor_baro_cycles_max,
+    		(unsigned long) (g_sensor_baro_cycles_max / 84U));
+    HAL_UART_Transmit(&huart1, (uint8_t*) buf, strlen(buf), HAL_MAX_DELAY);
+
 
     memset(buf, 0, sizeof(buf));
     vTaskGetRunTimeStats(buf);
@@ -329,6 +344,10 @@ void applicationInit(void) {
 	tofAcquisitionTaskID = osThreadNew(TOFAcquisitionTask, NULL, 
 		    &tofAcquisitionTaskAttr);
 	assert(tofAcquisitionTaskID != 0);
+
+	baroAcqTaskID = osThreadNew(BaroAcqTask, NULL,
+			&baroAcqTaskAttr);
+	assert(baroAcqTaskID != 0);
 
 	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
 	assert(uartCommTaskID != 0);
@@ -437,19 +456,7 @@ void uartCommTask(void *argument) {
 	}
 }
 
-//void IMUAcquisitionTask(void *argument) {
-//	(void) argument;
-//
-//	while (1) {
-//
-//		//int start = micros();
-//		SensorManager_RunOnce();
-//		//int end = micros();
-//		//int diff = end - start;
-//		//osDelay(IMU_SAMPLING_PERIOD_MS);
-//		osSemaphoreAcquire(IMUReleaseSemID, osWaitForever);
-//	}
-//}
+
 
 void IMUAcquisitionTask(void *argument) {
 	(void) argument;
@@ -468,7 +475,21 @@ void IMUAcquisitionTask(void *argument) {
 		 */
 		osSemaphoreAcquire(IMUReleaseSemID, osWaitForever);
 
-		SensorManager_RunOnce();
+		SensorManager_RunIMUOnce();
+	}
+}
+
+void BaroAcqTask(void *argument) {
+	(void) argument;
+
+	while (1) {
+		SensorManager_RunBaroOnce();
+
+		/*
+		 * Run barometer acquisition at BARO_SAMPLING_FREQ_HZ.
+		 * BARO_SAMPLING_PERIOD_MS = 1000 / BARO_SAMPLING_FREQ_HZ.
+		 */
+		osDelay(BARO_SAMPLING_PERIOD_MS);
 	}
 }
 

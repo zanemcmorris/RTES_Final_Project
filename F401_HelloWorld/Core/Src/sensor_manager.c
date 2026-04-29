@@ -65,6 +65,15 @@ volatile uint32_t g_sensor_runonce_cycles_last = 0;
 volatile uint32_t g_sensor_runonce_cycles_max = 0;
 volatile uint32_t g_sensor_runonce_cycles_min = 0xFFFFFFFFU;
 
+volatile uint32_t g_sensor_imu_cycles_last = 0;
+volatile uint32_t g_sensor_imu_cycles_max = 0;
+volatile uint32_t g_sensor_imu_cycles_min = 0xFFFFFFFFU;
+
+volatile uint32_t g_sensor_baro_cycles_last = 0;
+volatile uint32_t g_sensor_baro_cycles_max = 0;
+volatile uint32_t g_sensor_baro_cycles_min = 0xFFFFFFFFU;
+
+
 static uint32_t micros(void) {
 	return (uint32_t) ((HAL_GetTick() * 1000U)
 			+ ((SysTick->LOAD - SysTick->VAL) * 1000U) / (SysTick->LOAD + 1U));
@@ -296,25 +305,6 @@ int32_t MX_LSM6DSR_Init(void) {
 	return LSM6DSR_OK;
 }
 
-/*static int32_t MX_LSM6DSR_FIFO_Test_Init(void) {
-	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
-			LSM6DSR_BYPASS_MODE) != LSM6DSR_OK)
-		return LSM6DSR_ERROR;
-
-	if (lsm6dsr_fifo_xl_batch_set(&(MotionSensor.Ctx),
-			LSM6DSR_XL_BATCHED_AT_104Hz) != LSM6DSR_OK)
-		return LSM6DSR_ERROR;
-
-	if (lsm6dsr_fifo_gy_batch_set(&(MotionSensor.Ctx),
-			LSM6DSR_GY_BATCHED_AT_104Hz) != LSM6DSR_OK)
-		return LSM6DSR_ERROR;
-
-	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
-			LSM6DSR_STREAM_MODE) != LSM6DSR_OK)
-		return LSM6DSR_ERROR;
-
-	return LSM6DSR_OK;
-}*/
 
 static int32_t MX_LSM6DSR_FIFO_Test_Init(void) {
 	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
@@ -363,9 +353,9 @@ int32_t MX_LPS22HH_Init(void) {
 			LPS22HH_LPF_ODR_DIV_9) != LPS22HH_OK)
 		return LPS22HH_ERROR;
 
-	if (LPS22HH_PRESS_SetOutputDataRate(&BaroSensor, 10.0f) != LPS22HH_OK)
+	if (LPS22HH_PRESS_SetOutputDataRate(&BaroSensor, (float)BARO_SAMPLING_FREQ_HZ) != LPS22HH_OK)
 		return LPS22HH_ERROR;
-	if (LPS22HH_TEMP_SetOutputDataRate(&BaroSensor, 10.0f) != LPS22HH_OK)
+	if (LPS22HH_TEMP_SetOutputDataRate(&BaroSensor, (float)BARO_SAMPLING_FREQ_HZ) != LPS22HH_OK)
 		return LPS22HH_ERROR;
 
 	return LPS22HH_OK;
@@ -900,18 +890,14 @@ int32_t SensorManager_Init(void) {
 	return 0;
 }
 
-void SensorManager_RunOnce(void) {
+
+
+void SensorManager_RunIMUOnce(void) {
 	static LSM6DSR_Axes_t accel = { 0 };
 	static LSM6DSR_Axes_t gyro = { 0 };
-	static float pressure_hpa = 0.0f;
-	static float temperature_c = 0.0f;
 
 	uint8_t acc_ready = 0;
 	uint8_t gyro_ready = 0;
-	uint8_t press_ready = 0;
-	uint8_t temp_ready = 0;
-
-	//uint32_t startClock = 0, endClock = 0, diffClock = 0;
 
 	uint32_t start_cycles = DWT->CYCCNT;
 
@@ -952,6 +938,30 @@ void SensorManager_RunOnce(void) {
 	preprocess_imu_sample(&g_raw_imu, &g_processed_imu);
 	osMutexRelease(IMUDataMutexID);
 
+	uint32_t end_cycles = DWT->CYCCNT;
+	uint32_t diff_cycles = end_cycles - start_cycles;
+
+	g_sensor_imu_cycles_last = diff_cycles;
+
+	if (diff_cycles > g_sensor_imu_cycles_max) {
+		g_sensor_imu_cycles_max = diff_cycles;
+	}
+
+	if (diff_cycles < g_sensor_imu_cycles_min) {
+		g_sensor_imu_cycles_min = diff_cycles;
+	}
+}
+
+
+void SensorManager_RunBaroOnce(void) {
+	static float pressure_hpa = 0.0f;
+	static float temperature_c = 0.0f;
+
+	uint8_t press_ready = 0;
+	uint8_t temp_ready = 0;
+
+	uint32_t start_cycles = DWT->CYCCNT;
+
 	LPS22HH_PRESS_Get_DRDY_Status(&BaroSensor, &press_ready);
 	LPS22HH_TEMP_Get_DRDY_Status(&BaroSensor, &temp_ready);
 	check_baro_overrun_flags();
@@ -974,7 +984,30 @@ void SensorManager_RunOnce(void) {
 	preprocess_baro_sample(&g_raw_baro, &g_processed_baro);
 	osMutexRelease(altitudeDataMutexID);
 
-	/* Keeping all debug TX behavior exactly as it is now: still commented */
+	uint32_t end_cycles = DWT->CYCCNT;
+	uint32_t diff_cycles = end_cycles - start_cycles;
+
+	g_sensor_baro_cycles_last = diff_cycles;
+
+	if (diff_cycles > g_sensor_baro_cycles_max) {
+		g_sensor_baro_cycles_max = diff_cycles;
+	}
+
+	if (diff_cycles < g_sensor_baro_cycles_min) {
+		g_sensor_baro_cycles_min = diff_cycles;
+	}
+}
+
+
+void SensorManager_RunOnce(void) {
+	uint32_t start_cycles = DWT->CYCCNT;
+
+	SensorManager_RunIMUOnce();
+	SensorManager_RunBaroOnce();
+
+	/*
+	 * Keeping all debug TX behavior exactly as it is now: still commented.
+	 */
 	/* imu_uart_send_raw_line(&accel, &gyro); */
 	/* imu_uart_send_processed_line(&g_processed_imu); */
 	/* baro_uart_send_processed_line(&g_processed_baro); */
@@ -982,23 +1015,22 @@ void SensorManager_RunOnce(void) {
 	/* baro_overrun_send_line(); */
 	/* imu_fifo_send_line(); */
 
+	uint32_t end_cycles = DWT->CYCCNT;
+	uint32_t diff_cycles = end_cycles - start_cycles;
 
+	g_sensor_runonce_cycles_last = diff_cycles;
 
+	if (diff_cycles > g_sensor_runonce_cycles_max) {
+		g_sensor_runonce_cycles_max = diff_cycles;
+	}
 
-    uint32_t end_cycles = DWT->CYCCNT;
-    uint32_t diff_cycles = end_cycles - start_cycles;
+	if (diff_cycles < g_sensor_runonce_cycles_min) {
+		g_sensor_runonce_cycles_min = diff_cycles;
+	}
 
-    g_sensor_runonce_cycles_last = diff_cycles;
-
-    if (diff_cycles > g_sensor_runonce_cycles_max) {
-        g_sensor_runonce_cycles_max = diff_cycles;
-    }
-
-    if (diff_cycles < g_sensor_runonce_cycles_min) {
-        g_sensor_runonce_cycles_min = diff_cycles;
-    }
-
-	/* Keep these unused helper references in file so compiler does not warn if needed later */
+	/*
+	 * Keep these unused helper references in file so compiler does not warn if needed later.
+	 */
 	(void) g_debug_output_mode;
 	(void) g_processed_tof;
 	(void) vl53l0x_basic_i2c_test;
@@ -1008,5 +1040,4 @@ void SensorManager_RunOnce(void) {
 	(void) tof_uart_send_processed_line;
 	(void) debug_output_send_current_mode;
 	(void) baro_overrun_send_line;
-	(void) imu_fifo_send_line;
 }
