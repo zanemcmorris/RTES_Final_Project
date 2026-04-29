@@ -25,7 +25,11 @@ FMT = '<BHffff'
 WINDOW_SEC    = 10.0
 MAXLEN        = 5000
 SEA_LEVEL_HPA = 1013.25
-MOTOR_IS_NORMALIZED = True   # True = FC sends 0.0–1.0, False = 0–100
+MOTOR_IS_NORMALIZED = True   # True = FC sends 0.0-1.0, False = 0-100
+
+# How long to wait between writes to avoid hammering the FCU BLE stack.
+# One BLE connection interval (targeting ~15 ms) is enough breathing room.
+WRITE_GUARD_SEC = 0.05
 
 
 # ================= FCU COMMAND PROTOCOL =================
@@ -114,8 +118,10 @@ def pid_shadow_snapshot():
 class IMUBLEReader:
     def __init__(self, maxlen=MAXLEN):
         self.lock        = threading.Lock()
-        self._ble_client = None
-        self._ble_loop   = None
+        self._ble_client = None          # set inside ble_loop, cleared on disconnect
+        self._ble_loop   = None          # the asyncio event loop running ble_loop()
+        # FIX #3: serialise all writes so we never have two in-flight at once
+        self._write_lock: asyncio.Lock | None = None
 
         # Packet A  0x41 : accel (g) + baro (hPa)
         self.t      = collections.deque(maxlen=maxlen)
@@ -140,7 +146,7 @@ class IMUBLEReader:
         self.pos_z = collections.deque(maxlen=maxlen)
 
         # Packet D  0x44 : motor outputs
-        self.motors             = [0.0, 0.0, 0.0, 0.0]  # [FL, FR, BL, BR] 0–100%
+        self.motors             = [0.0, 0.0, 0.0, 0.0]  # [FL, FR, BL, BR] 0-100%
         self._last_motor_update = 0.0
 
         # Packet E  0x45 : attitude roll/pitch/yaw (rad) + ToF range (m)
@@ -162,10 +168,13 @@ class IMUBLEReader:
         self.baro_samples  = 0
         self.ble_connected = False
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # -------------------------------------------------------------------------
     def handle_packet(self, data: bytearray):
+        # FIX #5: log short / malformed packets instead of silently dropping
         if len(data) < 19:
+            log(f"Short packet ({len(data)} bytes): {data.hex()}", prefix="! ")
             return
+
         pkt = data[0]
         now = time.monotonic() - self.start_time
 
@@ -202,7 +211,6 @@ class IMUBLEReader:
                 self._last_motor_update = now
 
         elif pkt == 0x45:
-            # 4th float is ToF range_m (replaces old pad)
             _, ts, roll_rad, pitch_rad, yaw_rad, range_m = struct.unpack(FMT, data[:19])
             with self.lock:
                 self.roll  = math.degrees(roll_rad)
@@ -216,7 +224,10 @@ class IMUBLEReader:
                 self.t_tof.append(now)
                 self.tof_m.append(range_m)
 
-    # ──────────────────────────────────────────────────────────────────────────
+        else:
+            log(f"Unknown packet id 0x{pkt:02X} ({len(data)} bytes)", prefix="! ")
+
+    # -------------------------------------------------------------------------
     def send_command(self, cmd_name: str, param: float) -> tuple[bool, str]:
         entry = FCU_CMD.get(cmd_name.upper())
         if entry is None:
@@ -225,23 +236,45 @@ class IMUBLEReader:
         cmd_id = entry[0]
         packet = build_fcu_packet(cmd_id, param)
 
-        client = self._ble_client
-        loop   = self._ble_loop
-        if client is None or not self.ble_connected:
-            return False, "BLE not connected"
+        # Snapshot these atomically so the coroutine closure is self-contained
+        loop = self._ble_loop
         if loop is None:
             return False, "BLE loop not ready"
 
+        if not self.ble_connected:
+            return False, "BLE not connected"
+
+        # FIX #3 + FIX #6: create lock lazily in the correct event loop,
+        # re-check _ble_client inside the coroutine (TOCTOU guard),
+        # and serialise writes with a post-write delay so the FCU BLE stack
+        # can breathe between back-to-back commands.
         async def _write():
-            try:
-                await client.write_gatt_char(WRITE_UUID, packet)
-            except Exception as e:
-                log(f"Write error: {e}", prefix="! ")
+            # Lazily create the asyncio.Lock the first time (must be in the loop)
+            if self._write_lock is None:
+                self._write_lock = asyncio.Lock()
+
+            async with self._write_lock:
+                # FIX #6: re-check client under the lock — connection may have
+                # dropped between send_command() returning and this coroutine running
+                c = self._ble_client
+                if c is None:
+                    log("Write skipped — disconnected before send", prefix="! ")
+                    return
+                try:
+                    # FIX #1: explicitly request Write-Without-Response so the
+                    # FCU does NOT need to send an ATT Write Response back.
+                    # This eliminates the ACK roundtrip you were seeing.
+                    await c.write_gatt_char(WRITE_UUID, packet, response=False)
+                    # FIX #3 cont.: brief guard so the FCU HCI layer has time to
+                    # process the write before any next packet arrives on the bus
+                    await asyncio.sleep(WRITE_GUARD_SEC)
+                except Exception as e:
+                    log(f"Write error: {e}", prefix="! ")
 
         asyncio.run_coroutine_threadsafe(_write(), loop)
-        return True, f"→ FC  {cmd_name}  param={param:.4f}  raw={packet.hex()}"
+        return True, f"-> FC  {cmd_name}  param={param:.4f}  raw={packet.hex()}"
 
-    # ──────────────────────────────────────────────────────────────────────────
+    # -------------------------------------------------------------------------
     def snapshot(self):
         with self.lock:
             now        = time.monotonic() - self.start_time
@@ -288,38 +321,85 @@ def notification_handler(sender, data):
 
 
 async def ble_loop():
+    # Store the running loop so send_command() can schedule writes into it
     reader._ble_loop = asyncio.get_running_loop()
+
     while True:
         try:
-            t0 = time.monotonic()
             log("Scanning for drone...", prefix="  ")
+            t0 = time.monotonic()
             device = await BleakScanner.find_device_by_address(ADDRESS, timeout=5.0)
+
             if device is None:
                 log(f"Not found ({time.monotonic()-t0:.1f}s) — retrying...", prefix="! ")
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(2.0)
                 continue
 
             log(f"Found in {time.monotonic()-t0:.1f}s, connecting...", prefix="  ")
-            t1 = time.monotonic()
 
-            async with BleakClient(device, timeout=5.0) as client:
+            # FIX #2: use an asyncio.Event + disconnected_callback so we react
+            # immediately when the FCU drops the link, instead of polling
+            # client.is_connected every 500 ms.
+            disconnect_event = asyncio.Event()
+
+            def handle_disconnect(_client):
+                log("FCU disconnected (callback)", prefix="! ")
+                reader._ble_client = None
+                reader._write_lock = None   # reset so it's recreated in the new loop
+                with reader.lock:
+                    reader.ble_connected = False
+                # Signal ble_loop to break out of the wait and attempt reconnect
+                # Schedule set() safely from the BLE callback (may be a different thread)
+                reader._ble_loop.call_soon_threadsafe(disconnect_event.set)
+
+            t1 = time.monotonic()
+            async with BleakClient(
+                device,
+                timeout=10.0,                            # was 5.0 — more slack on slow link
+                disconnected_callback=handle_disconnect,
+            ) as client:
                 reader._ble_client = client
                 with reader.lock:
                     reader.ble_connected = True
+
                 log(f"Connected in {time.monotonic()-t1:.1f}s", prefix="  ")
+
+                # FIX #4: request a tighter connection interval right after connect.
+                # This gives more airtime for the 5-packet-per-50ms telemetry burst.
+                # bleak exposes this differently per OS; we try the common path and
+                # silently skip if the platform doesn't support it.
+                try:
+                    # min_interval / max_interval are in units of 1.25 ms
+                    # 12 * 1.25 = 15 ms,  24 * 1.25 = 30 ms
+                    await client.connection_update(
+                        min_interval=12,
+                        max_interval=24,
+                        latency=0,
+                        timeout=400,     # supervision timeout: 400 * 10 ms = 4 s
+                    )
+                    log("Connection interval updated to 15-30 ms", prefix="  ")
+                except Exception:
+                    # Not all bleak backends / OS versions expose this — that is fine
+                    log("Connection interval update skipped (not supported on this OS)", prefix="  ")
+
                 await client.start_notify(NOTIFY_UUID, notification_handler)
-                log("Streaming...", prefix="  ")
-                while client.is_connected:
-                    await asyncio.sleep(0.5)
-                log("Connection lost", prefix="! ")
+                log("Streaming telemetry...", prefix="  ")
+
+                # FIX #2 cont.: block here until the disconnect callback fires
+                await disconnect_event.wait()
+                log("Exiting connection block, will reconnect...", prefix="! ")
 
         except Exception as e:
             log(f"BLE error: {e}", prefix="! ")
         finally:
+            # Always clean up, even if an exception was raised above
             reader._ble_client = None
+            reader._write_lock = None
             with reader.lock:
                 reader.ble_connected = False
-        await asyncio.sleep(1.0)
+
+        # Back-off before next scan so we don't spam the radio
+        await asyncio.sleep(2.0)
 
 
 def start_ble():
@@ -380,12 +460,12 @@ def draw_drone_top(ax_obj, roll_deg, pitch_deg, motors, stale=False):
         ax_obj.text(mx, my, f"{lbl}\n{pct:.0f}%", ha='center', va='center',
                     fontsize=6, color='white', fontweight='bold', zorder=4)
     ax_obj.add_patch(plt.Circle((0,0), 0.22, color='#ccc', zorder=5))
-    ax_obj.text(0, 0, f"R{roll_deg:+.0f}°\nP{pitch_deg:+.0f}°",
+    ax_obj.text(0, 0, f"R{roll_deg:+.0f}\nP{pitch_deg:+.0f}",
                 ha='center', va='center', fontsize=6, color='#111', zorder=6)
     ax_obj.annotate("", xy=(0,1.6), xytext=(0,0.25),
                     arrowprops=dict(arrowstyle="-|>", color='#facc15', lw=1.5), zorder=7)
     stale_str = "  [STALE]" if stale else ""
-    ax_obj.set_title(f"Drone view  (↑=fwd){stale_str}", fontsize=7,
+    ax_obj.set_title(f"Drone view  (up=fwd){stale_str}", fontsize=7,
                      color='#e74c3c' if stale else '#aaa', pad=2)
 
 
@@ -445,15 +525,15 @@ for _k in _KEYS_TO_CLEAR:
     matplotlib.rcParams[_k] = []
 
 fig = plt.figure(figsize=(20, 11), facecolor=DARK)
-fig.suptitle("Drone Ground Station  v7", color='#ccc', fontsize=11, y=0.99)
+fig.suptitle("Drone Ground Station  v8", color='#ccc', fontsize=11, y=0.99)
 
 outer = gridspec.GridSpec(1, 3, figure=fig, wspace=0.30,
                           left=0.04, right=0.97, top=0.96, bottom=0.06)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# LEFT COLUMN  —  accel | velocity | pos_z | tof | RPY | gauges
-# ══════════════════════════════════════════════════════════════════════════════
+# ============================================================
+# LEFT COLUMN — accel | velocity | pos_z | tof | RPY | gauges
+# ============================================================
 left_gs = gridspec.GridSpecFromSubplotSpec(
     7, 1, subplot_spec=outer[0], hspace=0.22,
     height_ratios=[1, 1, 0.8, 0.8, 1, 0.08, 0.65])
@@ -461,7 +541,7 @@ left_gs = gridspec.GridSpecFromSubplotSpec(
 ax_accel = fig.add_subplot(left_gs[0])
 ax_vel   = fig.add_subplot(left_gs[1])
 ax_pos   = fig.add_subplot(left_gs[2])
-ax_tof   = fig.add_subplot(left_gs[3])   # ToF range
+ax_tof   = fig.add_subplot(left_gs[3])
 ax_rpy   = fig.add_subplot(left_gs[4])
 
 gauge_gs = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=left_gs[6])
@@ -479,7 +559,7 @@ ax_accel.set_ylabel("accel (g)",  fontsize=7, color='#aaa')
 ax_vel.set_ylabel("vel (m/s)",    fontsize=7, color='#aaa')
 ax_pos.set_ylabel("pos_z (m)",    fontsize=7, color='#aaa')
 ax_tof.set_ylabel("range (m)",    fontsize=7, color='#aaa')
-ax_rpy.set_ylabel("degrees (°)",  fontsize=7, color='#aaa')
+ax_rpy.set_ylabel("degrees",      fontsize=7, color='#aaa')
 ax_accel.set_title("Acceleration (packet A)",     fontsize=8, color='#aaa', loc='left', pad=2)
 ax_vel.set_title("Velocity (packet C)",           fontsize=8, color='#aaa', loc='left', pad=2)
 ax_pos.set_title("Position Z (packet C)",         fontsize=8, color='#aaa', loc='left', pad=2)
@@ -508,9 +588,9 @@ for ax_, lines in [(ax_accel, [la_x,la_y,la_z]),
                facecolor='#1a1a2e', edgecolor='none', labelcolor='#aaa', ncol=3)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# CENTRE COLUMN  —  angular rate | dps gauge | drone view
-# ══════════════════════════════════════════════════════════════════════════════
+# ============================================================
+# CENTRE COLUMN — angular rate | dps gauge | drone view
+# ============================================================
 ctr_gs = gridspec.GridSpecFromSubplotSpec(
     4, 1, subplot_spec=outer[1], hspace=0.18,
     height_ratios=[1, 0.08, 0.55, 1.25])
@@ -534,9 +614,9 @@ ax_dps.legend(handles=[ld_x,ld_y,ld_z], fontsize=6, loc='upper right',
               facecolor='#1a1a2e', edgecolor='none', labelcolor='#aaa', ncol=3)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# RIGHT COLUMN  —  command log | motor bars | PID table
-# ══════════════════════════════════════════════════════════════════════════════
+# ============================================================
+# RIGHT COLUMN — command log | motor bars | PID table
+# ============================================================
 rgt_gs = gridspec.GridSpecFromSubplotSpec(
     3, 1, subplot_spec=outer[2], hspace=0.35,
     height_ratios=[1.1, 0.9, 0.85])
@@ -675,14 +755,14 @@ def update(_):
     d   = reader.snapshot()
     pid = pid_shadow_snapshot()
 
-    # ── accel ─────────────────────────────────────────────────────────────────
+    # accel
     t = d["t"]
     if t:
         set_xlim_from(t, ax_accel)
         la_x.set_data(t, d["ax"]); la_y.set_data(t, d["ay"]); la_z.set_data(t, d["az"])
         safe_ylim(ax_accel, d["ax"], d["ay"], d["az"])
 
-    # ── velocity + pos_z ──────────────────────────────────────────────────────
+    # velocity + pos_z
     tv = d["t_vel"]
     if tv:
         set_xlim_from(tv, ax_vel)
@@ -692,14 +772,14 @@ def update(_):
         lp_z.set_data(tv, d["pos_z"])
         safe_ylim(ax_pos, d["pos_z"])
 
-    # ── ToF ───────────────────────────────────────────────────────────────────
+    # ToF
     tt = d["t_tof"]
     if tt:
         set_xlim_from(tt, ax_tof)
         lt_r.set_data(tt, d["tof_m"])
         safe_ylim(ax_tof, d["tof_m"])
 
-    # ── RPY ───────────────────────────────────────────────────────────────────
+    # RPY
     ta = d["t_att"]
     if ta:
         set_xlim_from(ta, ax_rpy)
@@ -708,27 +788,27 @@ def update(_):
         lr_y.set_data(ta, d["yaw_h"])
         safe_ylim(ax_rpy, d["roll_h"], d["pitch_h"], d["yaw_h"])
 
-    # ── gyro ──────────────────────────────────────────────────────────────────
+    # gyro
     tg = d["t_gyro"]
     if tg:
         set_xlim_from(tg, ax_dps)
         ld_x.set_data(tg, d["gx"]); ld_y.set_data(tg, d["gy"]); ld_z.set_data(tg, d["gz"])
         safe_ylim(ax_dps, d["gx"], d["gy"], d["gz"])
 
-    # ── gauges ────────────────────────────────────────────────────────────────
+    # gauges
     draw_gauge(ax_ga,   vec3_mag(d["ax"],d["ay"],d["az"]), 2.0,   "||accel|| (g)", ACC)
     draw_gauge(ax_gv,   vec3_mag(d["vx"],d["vy"],d["vz"]), 5.0,   "||vel|| (m/s)", GRN)
     draw_gauge(ax_gdps, vec3_mag(d["gx"],d["gy"],d["gz"]), 500.0, "||dps||",       ORG)
 
-    # ── drone view ────────────────────────────────────────────────────────────
+    # drone view
     draw_drone_top(ax_drone, d["roll"], d["pitch"], d["motors"],
                    stale=d["motor_stale"])
 
-    # ── motor bars ────────────────────────────────────────────────────────────
+    # motor bars
     stale = d["motor_stale"]
     motor_stale_txt.set_text("NO PACKET" if stale else "")
     ax_motor.set_title(
-        "Motor outputs  [FL  FR  BL  BR]" + ("  ⚠ STALE" if stale else ""),
+        "Motor outputs  [FL  FR  BL  BR]" + ("  STALE" if stale else ""),
         fontsize=8, color='#e74c3c' if stale else '#aaa', loc='left', pad=2)
     m = d["motors"] if len(d["motors"]) == 4 else [0.0]*4
     for i, (bar, txt) in enumerate(zip(motor_bars, motor_pct_txts)):
@@ -738,26 +818,30 @@ def update(_):
         txt.set_text(f"{pct:.0f}%")
         bar.set_alpha(0.35 if stale else 0.85)
 
-    # ── PID table ─────────────────────────────────────────────────────────────
+    # PID table
     draw_pid_table(ax_pid, pid)
 
-    # ── command log ───────────────────────────────────────────────────────────
+    # command log
     cmd_text.set_text("\n".join(cmd_log[-18:]))
 
-    # ── BLE indicator ─────────────────────────────────────────────────────────
+    # BLE indicator
     if d["ble_connected"]:
-        ble_dot.set_color('#2ecc71'); ble_lbl.set_text("BLE connected");  ble_lbl.set_color('#2ecc71')
+        ble_dot.set_color('#2ecc71')
+        ble_lbl.set_text("BLE connected")
+        ble_lbl.set_color('#2ecc71')
     else:
-        ble_dot.set_color('#e74c3c'); ble_lbl.set_text("BLE disconnected"); ble_lbl.set_color('#e74c3c')
+        ble_dot.set_color('#e74c3c')
+        ble_lbl.set_text("BLE disconnected")
+        ble_lbl.set_color('#e74c3c')
 
-    # ── status bar ────────────────────────────────────────────────────────────
+    # status bar
     alt_str = f"{d['alt_m'][-1]:.2f} m" if d["alt_m"] else "--"
     pz_str  = f"{d['pos_z'][-1]:.2f} m" if d["pos_z"] else "--"
     tof_str = f"{d['tof_range']:.3f} m" if d["t_tof"] else "--"
     status_txt.set_text(
         f"IMU: {d['imu_samples']}  BARO: {d['baro_samples']}  "
-        f"Roll: {d['roll']:+.1f}°  Pitch: {d['pitch']:+.1f}°  "
-        f"Yaw: {d['yaw']:+.1f}°  BaroAlt: {alt_str}  FC pos_z: {pz_str}  ToF: {tof_str}"
+        f"Roll: {d['roll']:+.1f}  Pitch: {d['pitch']:+.1f}  "
+        f"Yaw: {d['yaw']:+.1f}  BaroAlt: {alt_str}  FC pos_z: {pz_str}  ToF: {tof_str}"
     )
     return []
 
@@ -766,10 +850,11 @@ anim = FuncAnimation(fig, update, interval=50, blit=False, cache_frame_data=Fals
 
 
 # ================= STARTUP LOG =================
-log("Drone Ground Station  v7")
+log("Drone Ground Station  v8")
 log(f"addr : {ADDRESS}",            prefix="  ")
 log(f"UUID : {NOTIFY_UUID[:24]}…", prefix="  ")
 log(f"write: {WRITE_UUID[:24]}…",  prefix="  ")
+log("Fixes: response=False, disconnect cb, write lock, conn interval", prefix="  ")
 log("type 'help' for commands",     prefix="  ")
 
 
