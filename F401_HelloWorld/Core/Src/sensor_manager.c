@@ -305,25 +305,6 @@ int32_t MX_LSM6DSR_Init(void) {
 	return LSM6DSR_OK;
 }
 
-/*static int32_t MX_LSM6DSR_FIFO_Test_Init(void) {
-	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
-			LSM6DSR_BYPASS_MODE) != LSM6DSR_OK)
-		return LSM6DSR_ERROR;
-
-	if (lsm6dsr_fifo_xl_batch_set(&(MotionSensor.Ctx),
-			LSM6DSR_XL_BATCHED_AT_104Hz) != LSM6DSR_OK)
-		return LSM6DSR_ERROR;
-
-	if (lsm6dsr_fifo_gy_batch_set(&(MotionSensor.Ctx),
-			LSM6DSR_GY_BATCHED_AT_104Hz) != LSM6DSR_OK)
-		return LSM6DSR_ERROR;
-
-	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
-			LSM6DSR_STREAM_MODE) != LSM6DSR_OK)
-		return LSM6DSR_ERROR;
-
-	return LSM6DSR_OK;
-}*/
 
 static int32_t MX_LSM6DSR_FIFO_Test_Init(void) {
 	if (lsm6dsr_fifo_mode_set(&(MotionSensor.Ctx),
@@ -909,116 +890,7 @@ int32_t SensorManager_Init(void) {
 	return 0;
 }
 
-//void SensorManager_RunOnce(void) {
-//	static LSM6DSR_Axes_t accel = { 0 };
-//	static LSM6DSR_Axes_t gyro = { 0 };
-//	static float pressure_hpa = 0.0f;
-//	static float temperature_c = 0.0f;
-//
-//	uint8_t acc_ready = 0;
-//	uint8_t gyro_ready = 0;
-//	uint8_t press_ready = 0;
-//	uint8_t temp_ready = 0;
-//
-//	//uint32_t startClock = 0, endClock = 0, diffClock = 0;
-//
-//	uint32_t start_cycles = DWT->CYCCNT;
-//
-//	g_imu_task_loops++;
-//
-//	LSM6DSR_ACC_Get_DRDY_Status(&MotionSensor, &acc_ready);
-//	LSM6DSR_GYRO_Get_DRDY_Status(&MotionSensor, &gyro_ready);
-//
-//	if (acc_ready) {
-//		g_acc_ready_count++;
-//	}
-//
-//	if (gyro_ready) {
-//		g_gyro_ready_count++;
-//	}
-//
-//	if (acc_ready) {
-//		LSM6DSR_ACC_GetAxes(&MotionSensor, &accel);
-//		g_acc_read_count++;
-//	}
-//
-//	if (gyro_ready) {
-//		LSM6DSR_GYRO_GetAxes(&MotionSensor, &gyro);
-//		g_gyro_read_count++;
-//	}
-//
-//	g_raw_imu.timestamp_us = micros();
-//	g_raw_imu.accel_x_mg = accel.x;
-//	g_raw_imu.accel_y_mg = accel.y;
-//	g_raw_imu.accel_z_mg = accel.z;
-//	g_raw_imu.gyro_x_mdps = gyro.x;
-//	g_raw_imu.gyro_y_mdps = gyro.y;
-//	g_raw_imu.gyro_z_mdps = gyro.z;
-//	g_raw_imu.accel_ready = acc_ready;
-//	g_raw_imu.gyro_ready = gyro_ready;
-//
-//	osMutexAcquire(IMUDataMutexID, osWaitForever);
-//	preprocess_imu_sample(&g_raw_imu, &g_processed_imu);
-//	osMutexRelease(IMUDataMutexID);
-//
-//	LPS22HH_PRESS_Get_DRDY_Status(&BaroSensor, &press_ready);
-//	LPS22HH_TEMP_Get_DRDY_Status(&BaroSensor, &temp_ready);
-//	check_baro_overrun_flags();
-//
-//	if (press_ready) {
-//		LPS22HH_PRESS_GetPressure(&BaroSensor, &pressure_hpa);
-//	}
-//
-//	if (temp_ready) {
-//		LPS22HH_TEMP_GetTemperature(&BaroSensor, &temperature_c);
-//	}
-//
-//	g_raw_baro.timestamp_us = micros();
-//	g_raw_baro.pressure_hpa = pressure_hpa;
-//	g_raw_baro.temperature_c = temperature_c;
-//	g_raw_baro.pressure_ready = press_ready;
-//	g_raw_baro.temperature_ready = temp_ready;
-//
-//	osMutexAcquire(altitudeDataMutexID, osWaitForever);
-//	preprocess_baro_sample(&g_raw_baro, &g_processed_baro);
-//	osMutexRelease(altitudeDataMutexID);
-//
-//	/* Keeping all debug TX behavior exactly as it is now: still commented */
-//	/* imu_uart_send_raw_line(&accel, &gyro); */
-//	/* imu_uart_send_processed_line(&g_processed_imu); */
-//	/* baro_uart_send_processed_line(&g_processed_baro); */
-//	/* debug_output_send_current_mode(&accel, &gyro, &g_processed_imu, &g_processed_baro); */
-//	/* baro_overrun_send_line(); */
-//	/* imu_fifo_send_line(); */
-//
-//
-//
-//
-//    uint32_t end_cycles = DWT->CYCCNT;
-//    uint32_t diff_cycles = end_cycles - start_cycles;
-//
-//    g_sensor_runonce_cycles_last = diff_cycles;
-//
-//    if (diff_cycles > g_sensor_runonce_cycles_max) {
-//        g_sensor_runonce_cycles_max = diff_cycles;
-//    }
-//
-//    if (diff_cycles < g_sensor_runonce_cycles_min) {
-//        g_sensor_runonce_cycles_min = diff_cycles;
-//    }
-//
-//	/* Keep these unused helper references in file so compiler does not warn if needed later */
-//	(void) g_debug_output_mode;
-//	(void) g_processed_tof;
-//	(void) vl53l0x_basic_i2c_test;
-//	(void) vl53l0x_api_init_test;
-//	(void) vl53l0x_single_range_test;
-//	(void) vl53l0x_acquire_one_sample;
-//	(void) tof_uart_send_processed_line;
-//	(void) debug_output_send_current_mode;
-//	(void) baro_overrun_send_line;
-//	(void) imu_fifo_send_line;
-//}
+
 
 void SensorManager_RunIMUOnce(void) {
 	static LSM6DSR_Axes_t accel = { 0 };

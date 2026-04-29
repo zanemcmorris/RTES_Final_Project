@@ -67,9 +67,9 @@ osThreadAttr_t tofAcquisitionTaskAttr = { .name = "tofAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536 };
 osThreadId_t tofAcquisitionTaskID;
 
-osThreadAttr_t barometerAcquisitionTaskAttr = { .name = "barometerAcquisition", .priority =
+osThreadAttr_t baroAcqTaskAttr = { .name = "baroAcq", .priority =
 		(osPriorityRealtime - 4), .stack_size = 1024 };
-osThreadId_t barometerAcquisitionTaskID;
+osThreadId_t baroAcqTaskID;
 
 osThreadAttr_t RPYTaskAttr = { .name = "rpyPIDTask", .priority =
 		osPriorityRealtime, .stack_size = 1024 }; //needed?
@@ -168,7 +168,7 @@ void uartCommTask(void *argument);
 void IMUAcquisitionTask(void *argument);
 void TOFAcquisitionTask(void *argument);
 void flightControlTask(void *argument);
-void BarometerAcquisitionTask(void *argument);
+void BaroAcqTask(void *argument);
 void RPY_PID_task(void *arguments);
 void altitude_PID_task(void *arguments);
 void bluetoothControlTask(void *argument);
@@ -213,23 +213,6 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 	}
 }
 
-/*void PrintFreeRTOSStats(void)
-{
-    char buf[512];
-
-    memset(buf, 0, sizeof(buf));
-
-    snprintf(buf, sizeof(buf),
-             "\r\nTask          Abs Time      %% Time\r\n"
-             "--------------------------------------\r\n");
-
-    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
-
-    memset(buf, 0, sizeof(buf));
-    vTaskGetRunTimeStats(buf);
-
-    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
-}*/
 
 void PrintFreeRTOSStats(void)
 {
@@ -362,9 +345,9 @@ void applicationInit(void) {
 		    &tofAcquisitionTaskAttr);
 	assert(tofAcquisitionTaskID != 0);
 
-	barometerAcquisitionTaskID = osThreadNew(BarometerAcquisitionTask, NULL,
-			&barometerAcquisitionTaskAttr);
-	assert(barometerAcquisitionTaskID != 0);
+	baroAcqTaskID = osThreadNew(BaroAcqTask, NULL,
+			&baroAcqTaskAttr);
+	assert(baroAcqTaskID != 0);
 
 	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
 	assert(uartCommTaskID != 0);
@@ -473,19 +456,7 @@ void uartCommTask(void *argument) {
 	}
 }
 
-//void IMUAcquisitionTask(void *argument) {
-//	(void) argument;
-//
-//	while (1) {
-//
-//		//int start = micros();
-//		SensorManager_RunOnce();
-//		//int end = micros();
-//		//int diff = end - start;
-//		//osDelay(IMU_SAMPLING_PERIOD_MS);
-//		osSemaphoreAcquire(IMUReleaseSemID, osWaitForever);
-//	}
-//}
+
 
 void IMUAcquisitionTask(void *argument) {
 	(void) argument;
@@ -508,7 +479,7 @@ void IMUAcquisitionTask(void *argument) {
 	}
 }
 
-void BarometerAcquisitionTask(void *argument) {
+void BaroAcqTask(void *argument) {
 	(void) argument;
 
 	while (1) {
@@ -521,6 +492,7 @@ void BarometerAcquisitionTask(void *argument) {
 		osDelay(BARO_SAMPLING_PERIOD_MS);
 	}
 }
+
 void TOFAcquisitionTask(void *argument) {
     (void) argument;
 
