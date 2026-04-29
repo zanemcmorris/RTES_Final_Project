@@ -29,6 +29,7 @@ extern processed_imu_sample_t g_processed_imu;
 extern osMutexId_t altitudeDataMutexID;
 extern processed_baro_sample_t g_processed_baro;
 extern osMutexId_t outputThrustDataMutexID;
+extern volatile bool armMotors;
 
 //Lidar
 extern osMutexId_t tofDataMutexID;
@@ -59,10 +60,20 @@ void writeToMotors(motor_outputs_t* motors) {
     uint32_t brSetting = 2099 * motors->br;
     uint32_t blSetting = 2099 * motors->bl;
 
-    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, blSetting);
-    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, frSetting);
-    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, brSetting);
-    __HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, flSetting);
+    if(armMotors){
+    	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, blSetting);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, frSetting);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, brSetting);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, flSetting);
+    } else {
+    	__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_2, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_3, 0);
+		__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_4, 0);
+    }
+
+
+
 }
 
 float duty_from_thrust(float thrust01)
@@ -210,7 +221,7 @@ void RPY_RunControlLoop(RPY_PID_State_t *state) {
 #if ENABLE_ALT_CONTROL
 	float latestAltitude = globalAltitudeOuput;
 #else
-	float latestAltitude = BASE_THRUST + globalAltitudeOuput; // Math says ~70% is hovering
+	float latestAltitude = BASE_THRUST; // Math says ~70% is hovering
 #endif
 
 	//motor mixing algo (MMA)

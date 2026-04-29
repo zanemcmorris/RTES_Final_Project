@@ -36,7 +36,7 @@
 #include <VL53L0X_def.h>
 #include "hci_tl.h" 
 
-#define ALTITUDE_OFFSET_M (1)
+#define HOVER_HEIGHT_M (1)
 
 //extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim2;
@@ -45,7 +45,7 @@ extern processed_imu_sample_t g_processed_imu;
 extern processed_baro_sample_t g_processed_baro;
 volatile bool armMotors = false;
 extern volatile motor_outputs_t g_motor_outputs;
-const motor_outputs_t motor_zeros = {0};
+const motor_outputs_t motor_zeros = { 0 };
 extern volatile uint32_t g_sensor_runonce_cycles_last;
 extern volatile uint32_t g_sensor_runonce_cycles_min;
 extern volatile uint32_t g_sensor_runonce_cycles_max;
@@ -61,8 +61,6 @@ osThreadId_t ledHeartbeatID;
 osThreadAttr_t imuAcquisitionTaskAttr = { .name = "imuAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536 };
 osThreadId_t imuAcquisitionTaskID;
-
-
 
 osThreadAttr_t tofAcquisitionTaskAttr = { .name = "tofAcquisition", .priority =
 		osPriorityRealtime, .stack_size = 1536 };
@@ -85,7 +83,7 @@ osThreadAttr_t uartCommTaskAttr = { .name = "uartCommTask", .priority =
 osThreadId_t uartCommTaskID;
 
 osThreadAttr_t bleCommTaskAttr = { .name = "bleComm", .priority = osPriorityLow,
-		.stack_size = 1536 };
+		.stack_size = 2048 };
 osThreadId_t bleCommTaskID;
 
 const osMutexAttr_t IMUDataMutexAttr = { "IMUDataMutex", // human readable mutex name
@@ -103,10 +101,8 @@ const osMutexAttr_t altitudeDataMutexAttr = { "altitudeDataMutex", // human read
 osMutexId_t altitudeDataMutexID;
 
 const osMutexAttr_t tofDataMutexAttr = { "tofDataMutex",
-    osMutexRecursive | osMutexPrioInherit,
-	 NULL,
-	 0U 
-	};
+osMutexRecursive | osMutexPrioInherit,
+NULL, 0U };
 osMutexId_t tofDataMutexID;
 
 const osMutexAttr_t outputThrustDataMutexAttr = { "outputThrustDataMutex", // human readable mutex name
@@ -114,30 +110,29 @@ const osMutexAttr_t outputThrustDataMutexAttr = { "outputThrustDataMutex", // hu
 		NULL,                                     // memory for control block
 		0U                                        // size for control block
 		};
+
 osMutexId_t outputThrustDataMutexID;
 osMutexId_t pidMutex;
 
-
-//osSemaphoreId_t RPYReleaseSemID;
-//osSemaphoreId_t altitudeReleaseSemID;
 osSemaphoreId_t IMUReleaseSemID;
 osSemaphoreId_t RPYReleaseSemID;
 osSemaphoreId_t altitudeReleaseSemID;
 osSemaphoreId_t hciEventSemID;
 osTimerId_t RPYTimer;
+osTimerId_t altitudeTimer;
+
 static void RPYTimerCallback(void *argument) {
 	osSemaphoreRelease(RPYReleaseSemID);
 }
 
-osTimerId_t altitudeTimer;
 static void altitudeTimerCallback(void *argument) {
 	osSemaphoreRelease(altitudeReleaseSemID);
 }
 
 void TIM2_IMU_PeriodElapsedCallback(void) {
-    if (IMUReleaseSemID != NULL) {
-        osSemaphoreRelease(IMUReleaseSemID);
-    }
+	if (IMUReleaseSemID != NULL) {
+		osSemaphoreRelease(IMUReleaseSemID);
+	}
 }
 
 osEventFlagsId_t bleEventFlags;
@@ -182,17 +177,16 @@ void vApplicationIdleHook(void);
 void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName);
 
 /* USER CODE BEGIN 2 */
-void vApplicationIdleHook( void )
-{
-   /* vApplicationIdleHook() will only be called if configUSE_IDLE_HOOK is set
-   to 1 in FreeRTOSConfig.h. It will be called on each iteration of the idle
-   task. It is essential that code added to this hook function never attempts
-   to block in any way (for example, call xQueueReceive() with a block time
-   specified, or call vTaskDelay()). If the application makes use of the
-   vTaskDelete() API function (as this demo application does) then it is also
-   important that vApplicationIdleHook() is permitted to return to its calling
-   function, because it is the responsibility of the idle task to clean up
-   memory allocated by the kernel to any task that has since been deleted. */
+void vApplicationIdleHook(void) {
+	/* vApplicationIdleHook() will only be called if configUSE_IDLE_HOOK is set
+	 to 1 in FreeRTOSConfig.h. It will be called on each iteration of the idle
+	 task. It is essential that code added to this hook function never attempts
+	 to block in any way (for example, call xQueueReceive() with a block time
+	 specified, or call vTaskDelay()). If the application makes use of the
+	 vTaskDelete() API function (as this demo application does) then it is also
+	 important that vApplicationIdleHook() is permitted to return to its calling
+	 function, because it is the responsibility of the idle task to clean up
+	 memory allocated by the kernel to any task that has since been deleted. */
 }
 /* USER CODE END 2 */
 
@@ -215,77 +209,69 @@ void vApplicationStackOverflowHook(xTaskHandle xTask, signed char *pcTaskName) {
 	}
 }
 
+void PrintFreeRTOSStats(void) {
+	char buf[512];
 
-void PrintFreeRTOSStats(void)
-{
-    char buf[512];
+	memset(buf, 0, sizeof(buf));
 
-    memset(buf, 0, sizeof(buf));
+	snprintf(buf, sizeof(buf), "\r\nTask          Abs Time      %% Time\r\n"
+			"--------------------------------------\r\n");
+	HAL_UART_Transmit(&huart1, (uint8_t*) buf, strlen(buf), 100);
 
-    snprintf(buf, sizeof(buf),
-             "\r\nTask          Abs Time      %% Time\r\n"
-             "--------------------------------------\r\n");
-    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
+	snprintf(buf, sizeof(buf), "\r\nIMU only cycles:\r\n"
+			"  last: %lu cycles = %lu us\r\n"
+			"  min : %lu cycles = %lu us\r\n"
+			"  max : %lu cycles = %lu us\r\n",
+			(unsigned long) g_sensor_imu_cycles_last,
+			(unsigned long) (g_sensor_imu_cycles_last / 84U),
+			(unsigned long) g_sensor_imu_cycles_min,
+			(unsigned long) (g_sensor_imu_cycles_min / 84U),
+			(unsigned long) g_sensor_imu_cycles_max,
+			(unsigned long) (g_sensor_imu_cycles_max / 84U));
+	HAL_UART_Transmit(&huart1, (uint8_t*) buf, strlen(buf), HAL_MAX_DELAY);
 
-    snprintf(buf, sizeof(buf),
-    		"\r\nIMU only cycles:\r\n"
-    		"  last: %lu cycles = %lu us\r\n"
-    		"  min : %lu cycles = %lu us\r\n"
-    		"  max : %lu cycles = %lu us\r\n",
-    		(unsigned long) g_sensor_imu_cycles_last,
-    		(unsigned long) (g_sensor_imu_cycles_last / 84U),
-    		(unsigned long) g_sensor_imu_cycles_min,
-    		(unsigned long) (g_sensor_imu_cycles_min / 84U),
-    		(unsigned long) g_sensor_imu_cycles_max,
-    		(unsigned long) (g_sensor_imu_cycles_max / 84U));
-    HAL_UART_Transmit(&huart1, (uint8_t*) buf, strlen(buf), HAL_MAX_DELAY);
+	snprintf(buf, sizeof(buf), "\r\nBarometer only cycles:\r\n"
+			"  last: %lu cycles = %lu us\r\n"
+			"  min : %lu cycles = %lu us\r\n"
+			"  max : %lu cycles = %lu us\r\n",
+			(unsigned long) g_sensor_baro_cycles_last,
+			(unsigned long) (g_sensor_baro_cycles_last / 84U),
+			(unsigned long) g_sensor_baro_cycles_min,
+			(unsigned long) (g_sensor_baro_cycles_min / 84U),
+			(unsigned long) g_sensor_baro_cycles_max,
+			(unsigned long) (g_sensor_baro_cycles_max / 84U));
+	HAL_UART_Transmit(&huart1, (uint8_t*) buf, strlen(buf), HAL_MAX_DELAY);
 
-    snprintf(buf, sizeof(buf),
-    		"\r\nBarometer only cycles:\r\n"
-    		"  last: %lu cycles = %lu us\r\n"
-    		"  min : %lu cycles = %lu us\r\n"
-    		"  max : %lu cycles = %lu us\r\n",
-    		(unsigned long) g_sensor_baro_cycles_last,
-    		(unsigned long) (g_sensor_baro_cycles_last / 84U),
-    		(unsigned long) g_sensor_baro_cycles_min,
-    		(unsigned long) (g_sensor_baro_cycles_min / 84U),
-    		(unsigned long) g_sensor_baro_cycles_max,
-    		(unsigned long) (g_sensor_baro_cycles_max / 84U));
-    HAL_UART_Transmit(&huart1, (uint8_t*) buf, strlen(buf), HAL_MAX_DELAY);
+	memset(buf, 0, sizeof(buf));
+	vTaskGetRunTimeStats(buf);
 
+	HAL_UART_Transmit(&huart1, (uint8_t*) buf, strlen(buf), 100);
 
-    memset(buf, 0, sizeof(buf));
-    vTaskGetRunTimeStats(buf);
+	/*
+	 * Snapshot the volatile timing variables once.
+	 * This avoids reading them multiple times while SensorManager_RunOnce()
+	 * may be updating them in the IMU task.
+	 */
+	uint32_t last_cycles = g_sensor_runonce_cycles_last;
+	uint32_t min_cycles = g_sensor_runonce_cycles_min;
+	uint32_t max_cycles = g_sensor_runonce_cycles_max;
 
-    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
+	/*
+	 * CPU clock is 84 MHz, so:
+	 * 84 cycles = 1 microsecond.
+	 */
+	uint32_t last_us = last_cycles / 84U;
+	uint32_t min_us = min_cycles / 84U;
+	uint32_t max_us = max_cycles / 84U;
 
-    /*
-     * Snapshot the volatile timing variables once.
-     * This avoids reading them multiple times while SensorManager_RunOnce()
-     * may be updating them in the IMU task.
-     */
-    uint32_t last_cycles = g_sensor_runonce_cycles_last;
-    uint32_t min_cycles  = g_sensor_runonce_cycles_min;
-    uint32_t max_cycles  = g_sensor_runonce_cycles_max;
+	memset(buf, 0, sizeof(buf));
 
-    /*
-     * CPU clock is 84 MHz, so:
-     * 84 cycles = 1 microsecond.
-     */
-    uint32_t last_us = last_cycles / 84U;
-    uint32_t min_us  = min_cycles / 84U;
-    uint32_t max_us  = max_cycles / 84U;
+	snprintf(buf, sizeof(buf), "\r\nSensorManager_RunOnce:\r\n"
+			"cycles: last=%lu, min=%lu, max=%lu\r\n"
+			"time:   last=%lu us, min=%lu us, max=%lu us\r\n", last_cycles,
+			min_cycles, max_cycles, last_us, min_us, max_us);
 
-    memset(buf, 0, sizeof(buf));
-
-    snprintf(buf, sizeof(buf),
-             "\r\nSensorManager_RunOnce:\r\n"
-             "cycles: last=%lu, min=%lu, max=%lu\r\n"
-             "time:   last=%lu us, min=%lu us, max=%lu us\r\n",
-             last_cycles, min_cycles, max_cycles,
-             last_us, min_us, max_us);
-
-    HAL_UART_Transmit(&huart1, (uint8_t *)buf, strlen(buf), 100);
+	HAL_UART_Transmit(&huart1, (uint8_t*) buf, strlen(buf), 100);
 }
 /* USER CODE END 4 */
 
@@ -298,10 +284,9 @@ void PrintFreeRTOSStats(void)
 void applicationInit(void) {
 
 	assert(SensorManager_Init() == 0);
-	assert(vl53l0x_api_init_device() == VL53L0X_ERROR_NONE);
 
 	// Primitive creation
-	bleEventFlags = osEventFlagsNew(NULL); //Create the event flag for BLE task
+	bleEventFlags = osEventFlagsNew(NULL);
 	assert(bleEventFlags != NULL);
 
 	IMUDataMutexID = osMutexNew(&IMUDataMutexAttr);
@@ -316,15 +301,8 @@ void applicationInit(void) {
 	outputThrustDataMutexID = osMutexNew(&outputThrustDataMutexAttr);
 	assert(outputThrustDataMutexID != NULL);
 
-    pidMutex = osMutexNew(NULL);
+	pidMutex = osMutexNew(NULL);
 	assert(pidMutex != NULL);
-
-
-//	RPYReleaseSemID = osSemaphoreNew(1, 1, NULL);
-//	assert(RPYReleaseSemID != NULL);
-//
-//	altitudeReleaseSemID = osSemaphoreNew(1, 1, NULL);
-//	assert(altitudeReleaseSemID != NULL);
 
 	IMUReleaseSemID = osSemaphoreNew(1, 0, NULL);
 	assert(IMUReleaseSemID != NULL);
@@ -350,8 +328,7 @@ void applicationInit(void) {
 		    &tofAcquisitionTaskAttr);
 	assert(tofAcquisitionTaskID != 0);
 
-	baroAcqTaskID = osThreadNew(BaroAcqTask, NULL,
-			&baroAcqTaskAttr);
+	baroAcqTaskID = osThreadNew(BaroAcqTask, NULL, &baroAcqTaskAttr);
 	assert(baroAcqTaskID != 0);
 
 	uartCommTaskID = osThreadNew(uartCommTask, NULL, &uartCommTaskAttr);
@@ -375,13 +352,11 @@ void applicationInit(void) {
 	osTimerStart(RPYTimer, msToTicks(2));
 	osTimerStart(altitudeTimer, msToTicks(10));
 
+	// Start HW Timer 4 for motor PWM outputs
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
 	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
-
-	//HAL_TIM_Base_Start_IT(&htim2);
-
 }
 
 void RPY_PID_task(void *arguments) {
@@ -393,19 +368,19 @@ void RPY_PID_task(void *arguments) {
 			.currentState = { 0 } };
 
 	for (;;) {
-		//have GPIO pin go high here, then low at the very end of task and measure Ci with scope
-		//synchronization for 500 hz (2 ms period) from RTOS timer
 		osSemaphoreAcquire(RPYReleaseSemID, PID_SEMAPHORE_TIMEOUT); //determine proper timeout val
-		if(armMotors){
-			int start = micros();
-			RPY_RunControlLoop(&rpyPIDState);
-			writeToMotors(&g_motor_outputs);
-			int end = micros();
-			int diff = end - start;
-			diff -= diff; // remove unused warning
-		} else {
-			writeToMotors(&motor_zeros);
-		}
+		int start = micros();
+
+		RPY_RunControlLoop(&rpyPIDState);
+
+		osMutexAcquire(outputThrustDataMutexID, MUTEX_TIMEOUT);
+		writeToMotors(&g_motor_outputs);
+		osMutexRelease(outputThrustDataMutexID);
+
+		int end = micros();
+		int diff = end - start;
+		diff -= diff; // remove unused warning
+
 	}
 }
 
@@ -415,23 +390,17 @@ void altitude_PID_task(void *arguments) {
 			.altitudeLastError = 0, .altDerivativeFiltered = 0,
 			.currentAltitude = 0, .lastBaroTimestampUs = 0, .isFirstRun = true };
 
-	// while (altitudePIDParams.setpoint <= ALTITUDE_OFFSET_M) {
-	// 	osMutexAcquire(altitudeDataMutexID, osWaitForever);
-	// 	altitudePIDParams.setpoint = g_processed_baro.altitude_m
-	// 			+ ALTITUDE_OFFSET_M;
-	// 	osMutexRelease(altitudeDataMutexID);
-	// }
-
-	while (altitudePIDParams.setpoint <= ALTITUDE_OFFSET_M) {
-		osMutexAcquire(tofDataMutexID, osWaitForever);
-		altitudePIDParams.setpoint = g_processed_tof.range_m + ALTITUDE_OFFSET_M;
-        osMutexRelease(tofDataMutexID);
+	while (altitudePIDParams.setpoint <= HOVER_HEIGHT_M) {
+		osMutexAcquire(altitudeDataMutexID, osWaitForever);
+		altitudePIDParams.setpoint = g_processed_baro.altitude_m
+				+ HOVER_HEIGHT_M;
+		osMutexRelease(altitudeDataMutexID);
 	}
 
 	for (;;) {
 		//barometer can read 100-200 hz, lidar ~30hz
 		//synchronization for 100hz release from timer
-		osSemaphoreAcquire(altitudeReleaseSemID, PID_SEMAPHORE_TIMEOUT); //timeout val ok?
+		osSemaphoreAcquire(altitudeReleaseSemID, osWaitForever);
 		int start = micros();
 		Altitude_RunControlLoop(&altPIDState);
 		int end = micros();
@@ -461,8 +430,6 @@ void uartCommTask(void *argument) {
 	}
 }
 
-
-
 void IMUAcquisitionTask(void *argument) {
 	(void) argument;
 
@@ -474,11 +441,6 @@ void IMUAcquisitionTask(void *argument) {
 	assert(HAL_TIM_Base_Start_IT(&htim2) == HAL_OK);
 
 	while (1) {
-
-		/*
-		 * TIM2 releases this semaphore every ~2398 us.
-		 * This gives hardware-timed IMU acquisition instead of osDelay().
-		 */
 		osSemaphoreAcquire(IMUReleaseSemID, osWaitForever);
 
 		SensorManager_RunIMUOnce();
@@ -491,24 +453,20 @@ void BaroAcqTask(void *argument) {
 	while (1) {
 		SensorManager_RunBaroOnce();
 
-		/*
-		 * Run barometer acquisition at BARO_SAMPLING_FREQ_HZ.
-		 * BARO_SAMPLING_PERIOD_MS = 1000 / BARO_SAMPLING_FREQ_HZ.
-		 */
 		osDelay(BARO_SAMPLING_PERIOD_MS);
 	}
 }
 
 void TOFAcquisitionTask(void *argument) {
-    (void) argument;
+	(void) argument;
 
-    while (1) {
-        //int start = micros();
-        vl53l0x_acquire_one_sample();   
-       // int end = micros();
-       // int diff = end - start;
-        osDelay(33);
-    }
+	while (1) {
+		//int start = micros();
+		vl53l0x_acquire_one_sample();
+		// int end = micros();
+		// int diff = end - start;
+		osDelay(TOF_SAMPLING_PERIOD_MS);
+	}
 }
 /*
  Approach 1:
