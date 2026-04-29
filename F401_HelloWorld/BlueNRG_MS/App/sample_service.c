@@ -26,6 +26,7 @@
 #include "cmsis_os2.h"
 #include "custom.h"
 #include "rtos_flags.h"
+#include "sensor_manager.h"
 
 extern osMutexId_t pidMutex;
 extern PID_params_t altitudePIDParams;
@@ -414,6 +415,34 @@ void Attribute_Modified_CB(uint16_t handle, uint8_t data_length,
 				osMutexRelease(pidMutex);
 				printf("YAW Kd = %.2f\r\n", altitudePIDParams.kd);
 				break;
+			case 0x11:
+   	 			printf("CMD: ROLL SETPOINT %.2f deg\r\n", param);
+    			osMutexAcquire(pidMutex, osWaitForever);
+    			rollPIDParams.setpoint = param * DEG_TO_RAD;  // store in radians to match controller
+    			osMutexRelease(pidMutex);
+    			printf("ROLL setpoint = %.4f rad\r\n", rollPIDParams.setpoint);
+    			break;
+			case 0x12:
+    			printf("CMD: PITCH SETPOINT %.2f deg\r\n", param);
+    			osMutexAcquire(pidMutex, osWaitForever);
+    			pitchPIDParams.setpoint = param * DEG_TO_RAD;
+    			osMutexRelease(pidMutex);
+    			printf("PITCH setpoint = %.4f rad\r\n", pitchPIDParams.setpoint);
+    			break;
+			case 0x13:
+    			printf("CMD: YAW SETPOINT %.2f deg\r\n", param);
+    			osMutexAcquire(pidMutex, osWaitForever);
+    			yawPIDParams.setpoint = param * DEG_TO_RAD;
+    			osMutexRelease(pidMutex);
+    			printf("YAW setpoint = %.4f rad\r\n", yawPIDParams.setpoint);
+    			break;
+			case 0x14:
+    			printf("CMD: ALTITUDE SETPOINT %.2f m\r\n", param);
+    			osMutexAcquire(pidMutex, osWaitForever);
+    			altitudePIDParams.setpoint = param;           // already in metres
+    			osMutexRelease(pidMutex);
+    			printf("ALTITUDE setpoint = %.2f m\r\n", altitudePIDParams.setpoint);
+   				break;
 			// case 0x11:
 			// 	printf("CMD: MOVE_RIGHT %.2f m/s\r\n", param);
 			default:
