@@ -391,6 +391,7 @@ void altitude_PID_task(void *arguments) {
 		altitudePIDParams.setpoint = g_processed_baro.altitude_m
 				+ HOVER_HEIGHT_M;
 		osMutexRelease(altitudeDataMutexID);
+		osDelay(50); // Let other tasks run (baro task) so that we can get past this loop
 	}
 
 	for (;;) {
